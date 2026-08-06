@@ -1,0 +1,160 @@
+.TH SHELF 1 "2026-08-06" "shelf 0.1.0" "User Commands"
+.SH NAME
+shelf \- every repo you have, on GitHub and on this machine
+.SH SYNOPSIS
+.B shelf
+[\fIcommand\fR] [\fIoptions\fR]
+.SH DESCRIPTION
+.B shelf
+merges the repositories on your GitHub account with the git repositories on
+this machine and reports them as one list. Each repo carries a state:
+.B synced
+(on GitHub and cloned here),
+.B remote
+(on GitHub, not cloned) or
+.B local
+(on this machine only, with no origin or an origin someone else owns). That
+union is the point of the tool: neither
+.BR gh (1)
+nor the GitHub website can see unpushed commits, dirty worktrees, or a repo
+that exists nowhere but this Mac.
+.PP
+GitHub data comes from a single GraphQL query and is cached; the local git
+scan runs live on every invocation.
+.SH COMMANDS
+.TP
+.B triage
+Default when no command is given. Every repo sorted by most recent activity,
+with its push age, an eight-week commit sparkline, open issue count and local
+state. Repos untouched for longer than \fBactiveDays\fR collapse into a single
+\fIcold\fR line; \fB\-\-all\fR expands them.
+.TP
+.B audit
+Five checks. \fIhygiene\fR: public repos missing a description, README, license
+or topics (private repos are skipped and counted, since none of that is a
+defect there). \fIstale\fR: no push in \fBactiveDays\fR and not archived.
+\fIdead links\fR: \fBhomepageUrl\fR targets that did not answer 2xx. \fIheavy\fR:
+larger than \fBheavyMb\fR, usually committed binaries. \fIunpublished\fR: local
+repos with no remote. A check that finds nothing prints a tick rather than
+being hidden.
+.TP
+.B show \fIrepo\fR
+One repo on one screen: everything already cached, plus one live call for
+recent commits and CI state. For a repo with no GitHub side the commits come
+from the local log instead. The name is matched case-insensitively, and a near
+miss suggests candidates.
+.TP
+.B index
+Every public, non-fork repo grouped by language. This is the uncurated long
+tail, meant to be written to a file with \fB\-o\fR and published.
+.SH OPTIONS
+.TP
+.B \-\-all
+Include cold repos in triage instead of collapsing them.
+.TP
+.B \-\-refresh
+Refetch from GitHub, ignoring the cache TTL.
+.TP
+.B \-\-json
+Machine output: exactly one JSON value on stdout and nothing else. See
+.B JSON OUTPUT
+below.
+.TP
+.B \-\-html
+Render in a browser. Starts a server on a random port bound to 127.0.0.1,
+opens it, and runs until interrupted. The page sorts by any column and filters
+across all rows, and its refresh button refetches live.
+.TP
+.BR \-o ", " \-\-out " " \fIFILE\fR
+Write the HTML to \fIFILE\fR instead of serving it. The written page is static
+and carries no refresh button.
+.TP
+.B \-\-no\-open
+With \fB\-\-html\fR, do not launch the browser.
+.TP
+.B \-\-no\-links
+With \fBaudit\fR, skip the homepage link check. Makes the command work with no
+network.
+.TP
+.BR \-h ", " \-\-help
+Show help and exit.
+.TP
+.BR \-V ", " \-\-version
+Show version and exit.
+.SH SPARKLINE
+The eight-week bar is scaled to that repo's own busiest week, so it shows the
+shape of activity, not its magnitude; the adjacent commit count carries the
+magnitude. Weeks run oldest to newest, left to right. A week with no commits is
+the flat baseline, and any week with at least one commit rises above it, so
+"quiet" and "nothing" are never the same glyph.
+.SH AUTHENTICATION
+.B shelf
+reads
+.B GITHUB_TOKEN
+(or
+.BR GH_TOKEN ),
+and falls back to the token from
+.BR "gh auth token" .
+If neither is available it names both and exits non-zero. No token is ever
+written to disk by shelf.
+.SH FILES
+.TP
+.I ~/.config/shelf/config.json
+Written with defaults on first run. Keys: \fBscanPaths\fR (roots to scan,
+tilde allowed), \fBscanDepth\fR (how deep to walk, default 2), \fBactiveDays\fR
+(the warm/cold threshold, default 90), \fBcacheTtlMinutes\fR (default 60),
+\fBheavyMb\fR (default 20), \fBexclude\fR (repo names to drop entirely).
+.TP
+.I ~/.cache/shelf/repos.json
+The cached GitHub response. Delete it to force a cold fetch;
+.B \-\-refresh
+does the same without deleting.
+.SH JSON OUTPUT
+Every read command accepts \fB\-\-json\fR. Errors stay human-readable on stderr
+with a non-zero exit, so consumers branch on the exit code rather than parsing
+error output.
+.TP
+.B shelf \-\-json
+\fB{fetchedAt, cacheAgeMinutes, login, repos: []}\fR. Each repo is flat.
+Every GitHub-side key (\fBvisibility\fR, \fBlanguage\fR, \fBcommits8w\fR,
+\fBweeks\fR, \fBci\fR, ...) is \fBnull\fR when the repo is local-only, and
+every local-side key (\fBpath\fR, \fBbranch\fR, \fBdirty\fR, \fBahead\fR,
+\fBbehind\fR) is null when it is not cloned here. \fBnull\fR means it does not
+apply, never that it could not be read; \fBdirty: 0\fR means a clean worktree
+and \fBdirty: null\fR means there is no worktree.
+.TP
+.B shelf audit \-\-json
+\fB{hygiene, stale, deadLinks, heavy, unpublished, privateSkipped,
+linksChecked}\fR. The five checks are always arrays, empty when nothing was
+found. \fBlinksChecked\fR is false when \fB\-\-no\-links\fR was given, so an
+empty \fBdeadLinks\fR is never mistaken for a clean result.
+.TP
+.B shelf show \fIrepo\fR \fB\-\-json\fR
+One repo object in the shape above, plus \fBrecentCommits\fR.
+.TP
+.B shelf index \-\-json
+\fB{login, repos: []}\fR, public non-forks only.
+.SH EXIT STATUS
+0 on success. 1 on an unknown command or option, a missing or unknown repo
+name for \fBshow\fR, an unreadable config, or a GitHub failure with no cache to
+fall back on. A refresh that fails while a cache exists prints a warning,
+serves the cached data and exits 0.
+.SH EXAMPLES
+.TP
+.B shelf
+What is warm, what is cold, what is unpushed.
+.TP
+.B shelf \-\-all \-\-refresh
+Everything, freshly fetched.
+.TP
+.B shelf audit \-\-no\-links
+Every check that needs no network.
+.TP
+.B shelf index \-o repos.html
+Write the public index to a file.
+.TP
+.B shelf \-\-json | jq '.repos[] | select(.state == "local")'
+The repos that exist nowhere but this machine.
+.SH SEE ALSO
+.BR gh (1),
+.BR git (1)
