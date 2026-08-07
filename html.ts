@@ -36,8 +36,8 @@ const CSS = `
   --red: #ec6a6a;
   --cyan: #5cc2d6;
   --sel: #1e2a30;
-  --fs: 13px;
-  --lh: 20px;
+  --fs: 15px;
+  --lh: 24px;
   --ease: cubic-bezier(0.22, 1, 0.36, 1);
   --z-sticky: 100;
   color-scheme: dark;
@@ -176,7 +176,7 @@ td.t-accent a { color: var(--ink); }
 
 /* activity chart: SVG, but locked to whole character cells so the column is
    exactly 8ch wide and lines up with everything else. */
-.spark { display: inline-block; vertical-align: -3px; }
+.spark { display: inline-block; vertical-align: -0.18em; }
 /* Bar height is the data, so the bars are monochrome: spending the accent
    colour here would be decoration. Cyan means interaction, nothing else. */
 .spark rect { fill: var(--ink); shape-rendering: crispEdges; }
@@ -260,10 +260,16 @@ footer { color: var(--dim); margin-top: 3ch; }
 kbd { color: var(--ink); border: 1px solid var(--line); padding: 0 0.5ch; }
 
 /* ------------------------------------------------------------- responsive */
-@media (max-width: 1100px) { [data-drop="3"] { display: none; } }
-@media (max-width: 900px)  { [data-drop="2"] { display: none; } }
-@media (max-width: 760px)  { .controls { margin-left: 0; width: 100%; } input[type=search] { flex: 1; min-width: 0; } }
-@media (max-width: 520px) {
+/* Breakpoints track --fs: at 15px the eight-column table needs ~1180px of
+   content width, so these sit above that rather than at the old 13px values. */
+@media (max-width: 1280px) { [data-drop="3"] { display: none; } }
+@media (max-width: 1040px) { [data-drop="2"] { display: none; } }
+@media (max-width: 880px)  { .controls { margin-left: 0; width: 100%; } input[type=search] { flex: 1; min-width: 0; } }
+@media (max-width: 600px) {
+  /* The whole grid derives from --fs, so stepping the type down shrinks
+     everything proportionally — cheaper than dropping another column, and the
+     ones left (repo, age, state, note) all earn their place. */
+  :root { --fs: 13px; --lh: 20px; }
   [data-drop="1"] { display: none; }
   .wrap { padding-left: 1ch; padding-right: 1ch; }
   td, th { padding-right: 1ch; }
@@ -300,7 +306,10 @@ const JS = `
     // are cells, so the drawing scales with the font rather than fighting it.
     var NS = 'http://www.w3.org/2000/svg';
     var max = Math.max.apply(null, bars);
-    var n = bars.length, h = big ? 48 : 14;
+    // Derived from the line-height so the chart scales with --fs/--lh instead
+    // of staying pinned to whatever px looked right at one size.
+    var lh = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--lh')) || 20;
+    var n = bars.length, h = Math.round(big ? lh * 2.4 : lh * 0.7);
     var svg = document.createElementNS(NS, 'svg');
     svg.setAttribute('class', 'spark');
     svg.setAttribute('viewBox', '0 0 ' + n + ' ' + h);

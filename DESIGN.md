@@ -71,7 +71,17 @@ One family: `"JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Consolas`.
 Installed locally, referenced by name, never fetched — the page makes no network
 requests.
 
-13px on a 20px line. Fixed, not fluid: product UI is viewed at consistent DPI.
+**15px on a 24px line, and those two variables are the whole scale.** Every
+horizontal measure is in `ch` and every vertical one in `--lh`, so changing
+`--fs`/`--lh` resizes frames, padding, column widths and the activity chart
+together — verified: at 13px the chart measured 62.4px and at 15px it measures
+72px, both exactly eight rendered characters.
+
+Fixed, not fluid: product UI is viewed at consistent DPI. The one exception is
+below 600px, where `--fs` steps back to 13px — shrinking the derived grid is
+cheaper than dropping another column, and the four that remain (repo, age,
+state, note) all earn their place.
+
 Ligatures off (`font-variant-ligatures: none`) because `!=` and `=>` in commit
 messages should read as the characters they are. Tabular numerals throughout.
 
@@ -83,7 +93,7 @@ labels.
 
 **The character grid is real, not a metaphor.** Every horizontal measure is in
 `ch`: page width `132ch`, gutters `2ch`, column padding `2ch`, and the activity
-chart is exactly `8ch` — verified at 62.4px against eight rendered characters.
+chart is exactly `8ch` — verified at 72px against eight rendered characters.
 Rows are exactly one `--lh`.
 
 - Frames are **CSS borders, square corners** — not literal `┌─┐` characters.
@@ -93,9 +103,12 @@ Rows are exactly one `--lh`.
   a background matching the ground.
 - Sticky header; column headers stick beneath it at a `--head-h` measured in JS,
   because the header's height changes when a warning appears.
-- Responsive is structural: columns drop by priority (`lang`/`iss` at 1100px,
-  `commits` at 900, the chart at 520). **`note` never drops** — it carries
+- Responsive is structural: columns drop by priority (`lang`/`iss` at 1280px,
+  `commits` at 1040, the chart at 600). **`note` never drops** — it carries
   UNPUBLISHED, dirty and failing CI, the reason to open the page at all.
+  Breakpoints track `--fs`: at 15px the eight-column table needs ~1180px of
+  content width, so they sit above that rather than at the old 13px values.
+  Changing `--fs` means re-measuring them.
 
 ## Components
 
