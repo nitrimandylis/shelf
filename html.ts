@@ -20,35 +20,43 @@ export function jsonScript(value: unknown): string {
 }
 
 const CSS = `
+/* Monochrome structure, ANSI-16 accents. Colour only ever carries meaning:
+   nothing decorative on this page is coloured. Dark is the real design; the
+   light variant is the daylight fallback. */
 :root {
-  --bg: oklch(99% 0.002 250);
-  --surface: oklch(97% 0.004 250);
-  --raised: oklch(94.5% 0.006 250);
-  --ink: oklch(23% 0.012 250);
-  --muted: oklch(50% 0.015 250);
-  --line: oklch(91% 0.005 250);
-  --accent: oklch(52% 0.17 255);
-  --good: oklch(48% 0.13 150);
-  --warn: oklch(52% 0.13 70);
-  --bad: oklch(52% 0.19 25);
-  --shadow: 0 1px 2px oklch(23% 0.012 250 / 0.06);
+  --bg: #0a0a0b;
+  --surface: #131316;
+  --raised: #1b1b1f;
+  --line: #2c2c31;
+  --line-bright: #3d3d44;
+  --ink: #e9e9ec;
+  --dim: #9a9aa2;
+  --green: #7ec96b;
+  --yellow: #e0b252;
+  --red: #ec6a6a;
+  --cyan: #5cc2d6;
+  --sel: #1e2a30;
+  --fs: 13px;
+  --lh: 20px;
   --ease: cubic-bezier(0.22, 1, 0.36, 1);
   --z-sticky: 100;
-  --z-tooltip: 300;
+  color-scheme: dark;
 }
-@media (prefers-color-scheme: dark) {
+@media (prefers-color-scheme: light) {
   :root {
-    --bg: oklch(16% 0.008 250);
-    --surface: oklch(20% 0.010 250);
-    --raised: oklch(24% 0.012 250);
-    --ink: oklch(93% 0.006 250);
-    --muted: oklch(66% 0.014 250);
-    --line: oklch(28% 0.010 250);
-    --accent: oklch(74% 0.14 255);
-    --good: oklch(76% 0.14 150);
-    --warn: oklch(80% 0.13 80);
-    --bad: oklch(72% 0.16 20);
-    --shadow: 0 1px 2px oklch(0% 0 0 / 0.3);
+    --bg: #fbfbfa;
+    --surface: #f2f2ef;
+    --raised: #e8e8e4;
+    --line: #d3d3ce;
+    --line-bright: #b4b4ae;
+    --ink: #16161a;
+    --dim: #5c5c64;
+    --green: #2f7d24;
+    --yellow: #8a5c00;
+    --red: #bc2f2e;
+    --cyan: #0f6c80;
+    --sel: #e3edf1;
+    color-scheme: light;
   }
 }
 
@@ -58,177 +66,152 @@ body {
   margin: 0;
   background: var(--bg);
   color: var(--ink);
-  font: 0.9375rem/1.5 ui-sans-serif, -apple-system, system-ui, "Segoe UI", sans-serif;
+  font-family: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: var(--fs);
+  line-height: var(--lh);
   font-variant-numeric: tabular-nums;
+  font-variant-ligatures: none;
   overflow-x: hidden;
 }
-.wrap { max-width: 1400px; margin: 0 auto; padding: 0 1.25rem 5rem; }
+.wrap { max-width: 132ch; margin: 0 auto; padding: 2ch 2ch 6ch; }
 
-/* ---------------------------------------------------------------- header */
-header {
-  position: sticky; top: 0; z-index: var(--z-sticky);
-  background: color-mix(in oklch, var(--bg) 88%, transparent);
-  backdrop-filter: blur(8px);
-  border-bottom: 1px solid var(--line);
-  margin: 0 -1.25rem 1rem;
-  padding: 0.875rem 1.25rem 0;
+/* ------------------------------------------------------------- framing */
+/* CSS borders rather than literal box-drawing characters: same look, but it
+   survives reflow and never lands in copy-paste or a screen reader. */
+.frame { border: 1px solid var(--line); position: relative; }
+.legend {
+  position: absolute; top: 0; left: 2ch; transform: translateY(-50%);
+  background: var(--bg); padding: 0 1ch; margin: 0;
+  font-size: var(--fs); font-weight: 700; letter-spacing: 0.12em;
 }
-.bar { display: flex; flex-wrap: wrap; gap: 0.5rem 1rem; align-items: baseline; }
-h1 {
-  font-size: 1.125rem; margin: 0; letter-spacing: 0.06em; font-weight: 620;
-}
-.meta { color: var(--muted); font-size: 0.75rem; }
-.controls { margin-left: auto; display: flex; gap: 0.5rem; align-items: center; }
-.warning {
-  width: 100%; color: var(--warn); font-size: 0.8125rem;
-  margin-top: 0.375rem;
-}
+.legend .sub { font-weight: 400; letter-spacing: 0; color: var(--dim); }
 
-input[type=search], select, button.btn {
-  font: inherit; font-size: 0.8125rem;
-  padding: 0.3rem 0.55rem;
-  border: 1px solid var(--line); border-radius: 6px;
-  background: var(--surface); color: var(--ink);
-  transition: border-color 0.15s var(--ease), background 0.15s var(--ease);
+header { position: sticky; top: 0; z-index: var(--z-sticky); background: var(--bg); padding-top: 1px; }
+header .frame { padding: 1.2ch 2ch 1ch; }
+.bar { display: flex; flex-wrap: wrap; gap: 0.5ch 2ch; align-items: center; }
+.meta { color: var(--dim); }
+.controls { margin-left: auto; display: flex; gap: 1ch; align-items: center; }
+.warning { width: 100%; color: var(--yellow); margin-top: 0.5ch; }
+
+/* ------------------------------------------------------------- controls */
+input[type=search], select, button.btn, .chip {
+  font: inherit; font-family: inherit;
+  background: transparent; color: var(--ink);
+  border: 1px solid var(--line); border-radius: 0;
+  padding: 0 1ch; height: var(--lh); line-height: calc(var(--lh) - 2px);
+  transition: border-color 0.12s var(--ease), color 0.12s var(--ease), background 0.12s var(--ease);
 }
-input[type=search] { min-width: 13rem; }
-input[type=search]::placeholder { color: var(--muted); opacity: 1; }
-button.btn { cursor: pointer; }
-button.btn:hover:not(:disabled), input[type=search]:hover, select:hover { border-color: var(--muted); }
+input[type=search] { min-width: 24ch; }
+input[type=search]::placeholder { color: var(--dim); opacity: 1; }
+button.btn, .chip, select { cursor: pointer; }
+button.btn:hover:not(:disabled), input[type=search]:hover, select:hover, .chip:hover {
+  border-color: var(--line-bright); color: var(--ink);
+}
 button.btn:active:not(:disabled) { background: var(--raised); }
-button.btn:disabled { opacity: 0.6; cursor: default; }
+button.btn:disabled { color: var(--dim); cursor: default; }
 :where(input, select, button, a, tr):focus-visible {
-  outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 4px;
+  outline: 1px solid var(--cyan); outline-offset: 1px;
 }
-label.sel-label { display: flex; align-items: center; gap: 0.35rem; font-size: 0.75rem; color: var(--muted); }
+.sel-label { color: var(--dim); display: inline-flex; align-items: center; gap: 1ch; }
 
-/* progress: a refresh takes 9-11s and must never look like a frozen page */
-.progress { height: 2px; margin: 0.75rem -1.25rem 0; overflow: hidden; background: transparent; }
-.progress.on { background: var(--line); }
+.progress { height: 1px; background: transparent; margin-top: 1ch; }
+.progress.on { background: var(--line); overflow: hidden; }
 .progress.on::after {
-  content: ""; display: block; height: 100%; width: 35%;
-  background: var(--accent); animation: slide 1.1s infinite var(--ease);
+  content: ""; display: block; height: 100%; width: 30%;
+  background: var(--cyan); animation: slide 1.1s infinite linear;
 }
-@keyframes slide { 0% { transform: translateX(-100%); } 100% { transform: translateX(385%); } }
+@keyframes slide { from { transform: translateX(-100%); } to { transform: translateX(433%); } }
 
-/* ---------------------------------------------------------------- facets */
-.facets { display: flex; flex-wrap: wrap; gap: 0.375rem; padding: 0.625rem 0 0.75rem; }
-.chip {
-  font: inherit; font-size: 0.75rem; cursor: pointer;
-  display: inline-flex; align-items: center; gap: 0.35rem;
-  padding: 0.2rem 0.5rem; border-radius: 999px;
-  border: 1px solid var(--line); background: transparent; color: var(--muted);
-  transition: color 0.15s var(--ease), border-color 0.15s var(--ease), background 0.15s var(--ease);
-}
-.chip:hover { color: var(--ink); border-color: var(--muted); }
-.chip[aria-pressed="true"] {
-  background: color-mix(in oklch, var(--accent) 14%, transparent);
-  border-color: var(--accent); color: var(--ink);
-}
-.chip .n { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; color: var(--ink); }
-.chip.warn .n { color: var(--warn); }
+/* ------------------------------------------------------------- facets */
+.facets { display: flex; flex-wrap: wrap; gap: 1ch; margin: 2ch 0 1ch; }
+.chip { border-color: transparent; color: var(--dim); padding: 0 1ch 0 0; }
+.chip .box { color: var(--dim); }
+.chip[aria-pressed="true"] { color: var(--ink); }
+.chip[aria-pressed="true"] .box { color: var(--cyan); }
+.chip .n { color: var(--ink); }
+.chip.warn .n { color: var(--yellow); }
 
-/* ---------------------------------------------------------------- table */
-section { margin-bottom: 2rem; }
-h2 {
-  font-size: 0.9375rem; margin: 0 0 0.125rem; font-weight: 600;
-}
-h2 .desc { font-weight: 400; color: var(--muted); }
-.note { color: var(--muted); font-size: 0.8125rem; margin: 0 0 0.5rem; }
-/* No overflow wrapper here on purpose: an overflow-x:auto ancestor becomes the
-   scrollport for position:sticky descendants and silently kills the sticky
-   column headers. The table is kept inside the viewport by dropping columns at
-   breakpoints and letting the last column wrap instead. */
-table { border-collapse: collapse; width: 100%; table-layout: auto; }
+/* ------------------------------------------------------------- sections */
+section { margin: 3ch 0; }
+section .frame { padding: 1.5ch 2ch 1ch; }
+h2 { font-size: var(--fs); margin: 0; font-weight: 700; letter-spacing: 0.06em; }
+h2 .desc { font-weight: 400; letter-spacing: 0; color: var(--dim); }
+.note { color: var(--dim); margin: 0 0 1ch; }
+
+table { border-collapse: collapse; width: 100%; }
 thead th {
-  position: sticky; top: var(--head-h, 3.25rem); z-index: 1;
-  background: var(--bg);
-  text-align: left; font-weight: 500; font-size: 0.6875rem;
-  color: var(--muted); letter-spacing: 0.03em;
-  padding: 0.35rem 0.75rem 0.35rem 0; border-bottom: 1px solid var(--line);
-  cursor: pointer; user-select: none; white-space: nowrap;
+  position: sticky; top: var(--head-h, 6ch); z-index: 1; background: var(--bg);
+  text-align: left; font-weight: 400; color: var(--dim);
+  padding: 0 2ch 0 0; border-bottom: 1px solid var(--line);
+  cursor: pointer; user-select: none; white-space: nowrap; height: var(--lh);
 }
 thead th:hover { color: var(--ink); }
-thead th .dir { opacity: 0; }
-thead th[data-dir] .dir { opacity: 1; }
+thead th .dir { visibility: hidden; }
+thead th[data-dir] .dir { visibility: visible; color: var(--cyan); }
 td {
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: 0.8125rem;
-  padding: 0.3rem 0.75rem 0.3rem 0;
-  border-bottom: 1px solid var(--line);
-  white-space: nowrap;
+  padding: 0 2ch 0 0; white-space: nowrap; height: var(--lh);
+  border-bottom: 1px solid transparent;
 }
-th.right, td.right { text-align: right; padding-right: 0.75rem; }
-td:last-child, th:last-child { white-space: normal; width: 99%; padding-right: 0; overflow-wrap: anywhere; }
-tbody tr { transition: background 0.12s var(--ease); }
+th.right, td.right { text-align: right; padding-right: 2ch; }
+td:last-child, th:last-child { white-space: normal; width: 99%; padding-right: 0; }
+tbody tr { transition: background 0.1s var(--ease); }
 tbody tr:hover { background: var(--surface); }
-tbody tr[aria-selected="true"] { background: color-mix(in oklch, var(--accent) 12%, var(--bg)); }
+tbody tr[aria-selected="true"] { background: var(--sel); }
+tbody tr[aria-selected="true"] td:first-child { box-shadow: inset 2px 0 0 var(--cyan); }
 tr.group-head td {
-  font-family: inherit; font-size: 0.6875rem; letter-spacing: 0.04em;
-  color: var(--muted); padding-top: 1rem; border-bottom: 1px solid var(--line);
+  color: var(--dim); padding-top: 1.5ch; border-bottom: 1px solid var(--line);
+  letter-spacing: 0.08em;
 }
-tr.group-head .n { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
 
 a { color: inherit; text-decoration: none; border-bottom: 1px solid var(--line); }
-a:hover { color: var(--accent); border-color: currentColor; }
+a:hover { color: var(--cyan); border-color: currentColor; }
 
-.dot { display: inline-block; width: 6px; height: 6px; border-radius: 50%; margin-right: 0.45rem; vertical-align: 0.06em; background: currentColor; }
-.t-dim { color: var(--muted); }
-.t-good { color: var(--good); }
-.t-warn { color: var(--warn); }
-.t-bad { color: var(--bad); }
-.t-accent { color: var(--accent); }
+/* tone is the only coloured thing on the page */
+.t-dim { color: var(--dim); }
+.t-good { color: var(--green); }
+.t-warn { color: var(--yellow); }
+.t-bad { color: var(--red); }
+.t-accent { color: var(--ink); }
+td.t-accent a { color: var(--ink); }
 
-/* activity chart */
-.spark { display: block; overflow: visible; }
-.spark rect { fill: var(--accent); opacity: 0.75; transition: opacity 0.12s var(--ease); }
-.spark rect.zero { fill: var(--muted); opacity: 0.3; }
-.spark:hover rect { opacity: 0.4; }
-.spark rect:hover { opacity: 1; }
+/* activity chart: SVG, but locked to whole character cells so the column is
+   exactly 8ch wide and lines up with everything else. */
+.spark { display: inline-block; vertical-align: -3px; }
+/* Bar height is the data, so the bars are monochrome: spending the accent
+   colour here would be decoration. Cyan means interaction, nothing else. */
+.spark rect { fill: var(--ink); shape-rendering: crispEdges; }
+.spark rect.zero { fill: var(--line-bright); }
+.spark:hover rect { fill: var(--line-bright); }
+.spark rect:hover { fill: var(--cyan); }
 
-/* ---------------------------------------------------------------- kinds */
-.facts { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 0.3rem 1.5rem; }
-.facts dt { color: var(--muted); font-size: 0.75rem; padding-top: 0.1rem; }
-.facts dd {
-  margin: 0; font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: 0.8125rem; word-break: break-word;
-}
+/* ------------------------------------------------------------- kinds */
+.facts { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 0 3ch; }
+.facts dt { color: var(--dim); }
+.facts dd { margin: 0; word-break: break-word; }
 .timeline { list-style: none; margin: 0; padding: 0; }
-.timeline li {
-  display: grid; grid-template-columns: 3.5rem minmax(0, 1fr); gap: 1rem;
-  padding: 0.3rem 0; border-bottom: 1px solid var(--line);
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.8125rem;
-}
-.timeline .when { color: var(--muted); text-align: right; }
-.line { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.8125rem; margin: 0.2rem 0; word-break: break-word; }
-section.clean { margin-bottom: 0.75rem; }
-section.clean h2 { display: inline; font-size: 0.8125rem; font-weight: 500; color: var(--muted); }
-section.clean .tick { color: var(--good); margin-left: 0.5rem; font-size: 0.8125rem; }
+.timeline li { display: grid; grid-template-columns: 6ch minmax(0, 1fr); gap: 2ch; }
+.timeline .when { color: var(--dim); text-align: right; }
+.line { margin: 0; word-break: break-word; }
+section.clean { margin: 1ch 0; }
+section.clean .frame { border-color: transparent; padding: 0 2ch; }
+section.clean h2 { display: inline; font-weight: 400; color: var(--dim); letter-spacing: 0; }
+section.clean .legend { display: none; }
+section.clean .tick { color: var(--green); margin-left: 1ch; }
 section.clean .note { display: none; }
 
-.empty { color: var(--muted); font-size: 0.875rem; padding: 2.5rem 0; text-align: center; }
-.empty strong { color: var(--ink); display: block; margin-bottom: 0.25rem; font-weight: 550; }
-footer { color: var(--muted); font-size: 0.75rem; margin-top: 3rem; border-top: 1px solid var(--line); padding-top: 0.75rem; }
-kbd {
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.6875rem;
-  border: 1px solid var(--line); border-radius: 4px; padding: 0.05rem 0.3rem; color: var(--ink);
-}
+.empty { color: var(--dim); padding: 4ch 0; text-align: center; }
+.empty strong { color: var(--ink); display: block; font-weight: 700; }
+footer { color: var(--dim); margin-top: 3ch; }
+kbd { color: var(--ink); border: 1px solid var(--line); padding: 0 0.5ch; }
 
-/* responsive: drop columns by priority, never squeeze the table */
+/* ------------------------------------------------------------- responsive */
 @media (max-width: 1100px) { [data-drop="3"] { display: none; } }
 @media (max-width: 900px)  { [data-drop="2"] { display: none; } }
-@media (max-width: 760px)  {
-  .controls { margin-left: 0; width: 100%; }
-  input[type=search] { flex: 1; min-width: 0; }
-}
-/* Phone width: the chart is the last thing to go, and the gutters tighten,
-   because the table's minimum content width still has to fit the viewport. */
+@media (max-width: 760px)  { .controls { margin-left: 0; width: 100%; } input[type=search] { flex: 1; min-width: 0; } }
 @media (max-width: 520px) {
   [data-drop="1"] { display: none; }
-  .wrap { padding-left: 0.75rem; padding-right: 0.75rem; }
-  header { margin-left: -0.75rem; margin-right: -0.75rem; padding-left: 0.75rem; padding-right: 0.75rem; }
-  .progress { margin-left: -0.75rem; margin-right: -0.75rem; }
-  td, th { padding-right: 0.5rem; }
+  .wrap { padding-left: 1ch; padding-right: 1ch; }
+  td, th { padding-right: 1ch; }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -257,22 +240,30 @@ const JS = `
   function toneClass(t) { return t && t !== 'plain' ? 't-' + t : ''; }
 
   function sparkSvg(bars, big) {
+    // One bar per character cell: the svg is exactly bars.length ch wide, so
+    // the column lands on the same grid as every other column. viewBox units
+    // are cells, so the drawing scales with the font rather than fighting it.
     var NS = 'http://www.w3.org/2000/svg';
     var max = Math.max.apply(null, bars);
-    var w = big ? 14 : 5, gap = big ? 4 : 2, h = big ? 48 : 16;
+    var n = bars.length, h = big ? 48 : 14;
     var svg = document.createElementNS(NS, 'svg');
     svg.setAttribute('class', 'spark');
-    svg.setAttribute('width', String(bars.length * (w + gap) - gap));
-    svg.setAttribute('height', String(h));
+    svg.setAttribute('viewBox', '0 0 ' + n + ' ' + h);
+    svg.setAttribute('preserveAspectRatio', 'none');
+    svg.style.width = (big ? n * 2 : n) + 'ch';
+    svg.style.height = h + 'px';
     svg.setAttribute('role', 'img');
     svg.setAttribute('aria-label', bars.reduce(function (a, b) { return a + b; }, 0) + ' commits over 8 weeks');
     for (var i = 0; i < bars.length; i++) {
       var v = bars[i];
-      var bh = max > 0 && v > 0 ? Math.max(2, Math.round((v / max) * h)) : 1;
+      // Mirror the terminal's rule: any week with commits must be visibly
+      // taller than an empty one. Without a floor, a 64-commit week makes a
+      // 1-commit week 1px tall and 'quiet' reads as 'nothing'.
+      var bh = v > 0 ? Math.max(h * 0.14, (v / max) * h) : h * 0.04;
       var r = document.createElementNS(NS, 'rect');
-      r.setAttribute('x', String(i * (w + gap)));
+      r.setAttribute('x', String(i + 0.1));
       r.setAttribute('y', String(h - bh));
-      r.setAttribute('width', String(w));
+      r.setAttribute('width', '0.8');
       r.setAttribute('height', String(bh));
       if (!v) r.setAttribute('class', 'zero');
       var ago = bars.length - 1 - i;
@@ -288,13 +279,7 @@ const JS = `
     var td = el('td', (col && col.align === 'right' ? 'right ' : '') + toneClass(cell.tone));
     if (col && col.drop) td.setAttribute('data-drop', String(col.drop));
     if (cell.bars) { td.appendChild(sparkSvg(cell.bars, cell.bigBars)); return td; }
-    if (cell.dot) {
-      var d = el('span', 'dot ' + toneClass(cell.dot));
-      d.setAttribute('aria-hidden', 'true');
-      td.appendChild(d);
-    }
-    // cell.label is the browser wording; cell.text keeps the terminal glyphs.
-    var text = cell.label !== undefined ? cell.label : cell.text;
+    var text = cell.text;
     if (cell.href) {
       var a = el('a', null, text);
       a.href = cell.href; a.target = '_blank'; a.rel = 'noreferrer';
@@ -396,23 +381,26 @@ const JS = `
 
   function renderSection(section) {
     var sec = el('section', section.clean ? 'clean' : null);
+    var frame = el('div', 'frame');
+    sec.appendChild(frame);
+
     if (section.title) {
-      var h = el('h2');
-      var split = section.title.split(' \\u2014 ');
+      var h = el('h2', section.clean ? null : 'legend');
+      var split = section.title.split(' \u2014 ');
       h.appendChild(document.createTextNode(split[0]));
       if (split.length > 1) {
-        var d = el('span', 'desc', ' \\u2014 ' + split.slice(1).join(' \\u2014 '));
-        h.appendChild(d);
+        h.appendChild(el('span', 'desc', ' \u2014 ' + split.slice(1).join(' \u2014 ')));
       }
-      sec.appendChild(h);
-      if (section.clean) sec.appendChild(el('span', 'tick', '\\u2713 nothing'));
+      frame.appendChild(h);
+      if (section.clean) frame.appendChild(el('span', 'tick', '\u2713 nothing'));
     }
-    if (section.note) sec.appendChild(el('p', 'note', section.note));
+    if (section.note) frame.appendChild(el('p', 'note', section.note));
 
     var kind = section.kind || (section.columns ? 'table' : 'lines');
     var shown = section.rows.length;
 
-    if (section.clean) { return sec; }
+    if (section.clean) { return { node: sec, shown: 0 }; }
+
     if (kind === 'facts') {
       var dl = el('dl', 'facts');
       section.rows.forEach(function (r) {
@@ -425,7 +413,7 @@ const JS = `
         } else { dd.textContent = r.cells[1].text; }
         dl.appendChild(dd);
       });
-      sec.appendChild(dl);
+      frame.appendChild(dl);
     } else if (kind === 'timeline') {
       var ul = el('ul', 'timeline');
       section.rows.forEach(function (r) {
@@ -434,13 +422,13 @@ const JS = `
         li.appendChild(el('span', null, r.cells[1].text));
         ul.appendChild(li);
       });
-      sec.appendChild(ul);
+      frame.appendChild(ul);
     } else if (kind === 'lines') {
       section.rows.forEach(function (r) {
-        sec.appendChild(el('p', 'line ' + toneClass(r.cells[0].tone), r.cells.map(function (c) { return c.text; }).join(' ')));
+        frame.appendChild(el('p', 'line ' + toneClass(r.cells[0].tone), r.cells.map(function (c) { return c.text; }).join(' ')));
       });
     } else {
-      shown = renderTable(section, sec);
+      shown = renderTable(section, frame);
     }
     return { node: sec, shown: shown };
   }
@@ -450,16 +438,24 @@ const JS = `
     var total = 0;
     view.sections.forEach(function (s) {
       var out = renderSection(s);
-      var node = out.node || out;
-      total += out.shown === undefined ? s.rows.length : out.shown;
-      root.appendChild(node);
+      total += out.shown;
+      root.appendChild(out.node);
     });
 
-    if (total === 0) {
+    // Only a filter miss earns the empty state. An audit where every check came
+    // back clean also renders zero rows, and telling the user to clear a filter
+    // they never set would be nonsense.
+    var filtering = !!state.q || Object.keys(state.facets).length > 0;
+    if (total === 0 && filtering) {
       var e = el('div', 'empty');
       e.appendChild(el('strong', null, 'Nothing matches'));
-      e.appendChild(document.createTextNode('Clear the filter or a chip to see all ' + countAll() + ' repos.'));
+      e.appendChild(document.createTextNode('Clear the filter or a chip to see all ' + countAll() + ' rows.'));
       root.appendChild(e);
+    } else if (total === 0 && countAll() === 0) {
+      var e2 = el('div', 'empty');
+      e2.appendChild(el('strong', null, 'Nothing to show'));
+      e2.appendChild(document.createTextNode('No repos were found on GitHub or on this machine.'));
+      root.appendChild(e2);
     }
     state.sel = -1;
     updateMeta();
@@ -509,6 +505,8 @@ const JS = `
       var on = state.facets[f] === v;
       if (on) { delete state.facets[f]; } else { state.facets[f] = v; }
       chip.setAttribute('aria-pressed', on ? 'false' : 'true');
+      var box = chip.querySelector('.box');
+      if (box) box.textContent = on ? '[ ]' : '[x]';
       render();
     });
   });
@@ -529,7 +527,7 @@ const JS = `
         })
         .then(function () {
           refresh.disabled = false;
-          refresh.textContent = 'refresh';
+          refresh.textContent = '[ refresh ]';
           progress.className = 'progress';
         });
     });
@@ -570,7 +568,7 @@ function facetsHtml(view: View): string {
       (f) =>
         `<button class="chip ${f.tone === "warn" ? "warn" : ""}" type="button" aria-pressed="false"` +
         ` data-field="${esc(f.field)}" data-value="${esc(f.value)}">` +
-        `${esc(f.label)} <span class="n">${f.count}</span></button>`,
+        `<span class="box" aria-hidden="true">[ ]</span> ${esc(f.label)} <span class="n">${f.count}</span></button>`,
     )
     .join("");
   return `<div class="facets">${chips}</div>`;
@@ -589,7 +587,7 @@ export function renderHtml(
   opts: { refreshable?: boolean; dataUrl?: string } = {},
 ): string {
   const refresh = opts.refreshable
-    ? `<button class="btn" id="refresh" type="button" data-url="${esc(opts.dataUrl ?? "/api/data?refresh=1")}">refresh</button>`
+    ? `<button class="btn" id="refresh" type="button" data-url="${esc(opts.dataUrl ?? "/api/data?refresh=1")}">[ refresh ]</button>`
     : "";
 
   return `<!doctype html>
@@ -604,17 +602,19 @@ export function renderHtml(
 <body>
 <div class="wrap">
 <header>
-  <div class="bar">
-    <h1>${esc(view.title)}</h1>
-    <span class="meta" id="meta">${esc(view.meta)}</span>
-    <span class="controls">
-      <input type="search" id="filter" placeholder="filter…  (press /)" autocomplete="off" spellcheck="false" aria-label="Filter rows">
-      ${groupHtml(view)}
-      ${refresh}
-    </span>
-    <div class="warning" id="warning"${view.warning ? "" : " hidden"}>${view.warning ? "! " + esc(view.warning) : ""}</div>
+  <div class="frame">
+    <h1 class="legend">${esc(view.title)}</h1>
+    <div class="bar">
+      <span class="meta" id="meta">${esc(view.meta)}</span>
+      <span class="controls">
+        <input type="search" id="filter" placeholder="filter…  (press /)" autocomplete="off" spellcheck="false" aria-label="Filter rows">
+        ${groupHtml(view)}
+        ${refresh}
+      </span>
+      <div class="warning" id="warning"${view.warning ? "" : " hidden"}>${view.warning ? "! " + esc(view.warning) : ""}</div>
+    </div>
+    <div class="progress" id="progress"></div>
   </div>
-  <div class="progress" id="progress"></div>
 </header>
 ${facetsHtml(view)}
 <main id="views"></main>

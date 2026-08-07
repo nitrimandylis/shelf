@@ -87,6 +87,14 @@ With \fB\-\-html\fR, do not launch the browser.
 .B \-\-no\-links
 With \fBaudit\fR, skip the homepage link check. Makes the command work with no
 network.
+.SH LINK CHECKING
+\fBaudit\fR fetches each \fBhomepageUrl\fR with a 10 second budget and retries
+once when the request itself fails. A single timeout is not evidence a site is
+dead \- cold starts on free hosting routinely exceed a short deadline, and one
+transient blip once made this report three live sites as dead. An HTTP status is
+never retried, because the server answered and that answer is the finding. The
+report distinguishes the two: \fBno answer after 2 tries\fR is weaker evidence
+than \fBHTTP 404\fR.
 .TP
 .BR \-h ", " \-\-help
 Show help and exit.
@@ -138,7 +146,9 @@ and \fBdirty: null\fR means there is no worktree.
 .B shelf audit \-\-json
 \fB{hygiene, stale, deadLinks, heavy, unpublished, privateSkipped,
 linksChecked}\fR. The five checks are always arrays, empty when nothing was
-found. \fBlinksChecked\fR is false when \fB\-\-no\-links\fR was given, so an
+found. Dead-link findings carry \fBkind\fR: \fBhttp-error\fR when the
+server answered badly, \fBno-answer\fR when it did not answer twice.
+\fBlinksChecked\fR is false when \fB\-\-no\-links\fR was given, so an
 empty \fBdeadLinks\fR is never mistaken for a clean result.
 .TP
 .B shelf show \fIrepo\fR \fB\-\-json\fR

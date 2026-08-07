@@ -262,6 +262,8 @@ export type Finding = {
   repo: string;
   detail: string;
   url?: string;
+  /** dead-link findings only: did the server answer badly, or not answer? */
+  kind?: "http-error" | "no-answer";
 };
 
 export type AuditReport = {

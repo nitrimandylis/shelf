@@ -106,6 +106,11 @@ shelf audit --json | jq '.unpublished'
 - **`--no-links` makes audit work offline**, and sets `linksChecked: false`. An
   empty `deadLinks` with `linksChecked: false` means "not checked", not "all
   fine".
+- **A dead-link finding is not always a dead site.** Each URL gets 10s and one
+  retry, but a `kind: "no-answer"` finding still only means it did not respond
+  twice — cold starts on free hosting do that. `kind: "http-error"` is the solid
+  one: the server answered with a 4xx/5xx. Report the difference; do not tell
+  the user a site is down on a `no-answer` alone.
 - **Local matching is by origin URL only, never by directory name.** A local
   folder named `nous` with no remote stays `local` even when a GitHub repo
   called `nous` exists, because it is genuinely not pushed there.

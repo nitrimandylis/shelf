@@ -592,6 +592,26 @@ describe("triageView", () => {
   });
 });
 
+describe("dead-link reporting", () => {
+  test("a no-answer finding is labelled differently from an HTTP error", () => {
+    const view = auditView(
+      {
+        hygiene: [], stale: [], heavy: [], unpublished: [], skippedPrivate: 0,
+        deadLinks: [
+          { repo: "a", detail: "https://a — HTTP 404", url: "https://a", kind: "http-error" },
+          { repo: "b", detail: "https://b — no answer after 2 tries (timeout)", url: "https://b", kind: "no-answer" },
+        ],
+      },
+      { meta: "t", login: "n", activeDays: 90, heavyMb: 20 },
+    );
+    const rows = view.sections.find((s) => s.title?.startsWith("dead links"))!.rows;
+    expect(rows[0]!.cells[1]!.text).toContain("HTTP 404");
+    // the weaker evidence says how many tries it took, so it can't be mistaken
+    // for a server that actually answered
+    expect(rows[1]!.cells[1]!.text).toContain("no answer after 2 tries");
+  });
+});
+
 describe("section kinds", () => {
   test("a clean audit check is flagged so the browser can collapse it", () => {
     const view = auditView(

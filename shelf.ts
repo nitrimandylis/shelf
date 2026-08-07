@@ -202,8 +202,14 @@ async function buildAudit(g: Gathered, links: boolean): Promise<AuditReport> {
     .filter((r) => r.status === null || r.status >= 400)
     .map((r) => ({
       repo: r.repo,
-      detail: r.status === null ? `${r.url} — ${r.error}` : `${r.url} — HTTP ${r.status}`,
+      // "answered with an error" and "did not answer" are different strengths
+      // of evidence, and the report says which one it is.
+      detail:
+        r.status === null
+          ? `${r.url} — no answer after ${r.attempts} tries (${r.error})`
+          : `${r.url} — HTTP ${r.status}`,
       url: r.url,
+      kind: r.status === null ? ("no-answer" as const) : ("http-error" as const),
     }))
     .sort((a, b) => a.repo.localeCompare(b.repo));
 

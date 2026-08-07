@@ -254,29 +254,54 @@ export async function fetchRecentCommits(repo: string, limit = 8): Promise<Commi
   return nodes.map((n: GqlNode) => ({ date: n.committedDate, message: n.messageHeadline }));
 }
 
-/** HEAD each homepage URL. Returns null status when the request itself failed. */
+export type LinkResult = {
+  repo: string;
+  url: string;
+  status: number | null;
+  error?: string;
+  attempts: number;
+};
+
+/**
+ * Fetch each homepage URL, retrying once when the request itself fails.
+ *
+ * A single timeout is NOT evidence a site is dead: a transient blip once made
+ * this report three live Vercel apps as dead links, and cold starts on free
+ * tiers genuinely exceed a short deadline. So the budget is generous and one
+ * network failure is retried before anything is claimed. An HTTP status is
+ * never retried — the server answered, and that answer is the finding.
+ */
 export async function checkLinks(
   urls: { repo: string; url: string }[],
-  timeoutMs = 5000,
-): Promise<{ repo: string; url: string; status: number | null; error?: string }[]> {
+  timeoutMs = 10_000,
+): Promise<LinkResult[]> {
+  const once = (url: string) =>
+    fetch(url, {
+      method: "GET",
+      redirect: "follow",
+      signal: AbortSignal.timeout(timeoutMs),
+      headers: { "user-agent": "shelf link-check" },
+    });
+
   return Promise.all(
     urls.map(async ({ repo, url }) => {
-      try {
-        const res = await fetch(url, {
-          method: "GET",
-          redirect: "follow",
-          signal: AbortSignal.timeout(timeoutMs),
-          headers: { "user-agent": "shelf link-check" },
-        });
-        return { repo, url, status: res.status };
-      } catch (err) {
-        return {
-          repo,
-          url,
-          status: null,
-          error: err instanceof Error ? err.message : String(err),
-        };
+      for (let attempt = 1; attempt <= 2; attempt++) {
+        try {
+          const res = await once(url);
+          return { repo, url, status: res.status, attempts: attempt };
+        } catch (err) {
+          if (attempt === 2) {
+            return {
+              repo,
+              url,
+              status: null,
+              error: err instanceof Error ? err.message : String(err),
+              attempts: attempt,
+            };
+          }
+        }
       }
+      return { repo, url, status: null, error: "unreachable", attempts: 2 };
     }),
   );
 }

@@ -21,9 +21,7 @@ export type Cell = {
   href?: string;
   sort?: number | string; // renderers may sort on this instead of text
   bars?: number[]; // browser draws these as an SVG activity chart
-  dot?: Tone; // browser draws a leading state dot in this colour
   bigBars?: boolean; // draw the activity chart at detail size, not row size
-  label?: string; // browser wording; `text` keeps the terminal's glyphs
 };
 
 export type Column = { label: string; align?: "left" | "right"; flex?: boolean; drop?: number };
@@ -73,13 +71,12 @@ export type TriageOpts = {
 };
 
 function stateCell(e: Entry): Cell {
+  // On a character grid the glyph IS the marker, in both renderers. No CSS dot
+  // and no separate browser wording: one string, one alignment, one meaning.
   const mark = STATE_MARK[e.state];
-  // The glyph is the terminal's state marker; the browser draws a dot instead,
-  // so `label` drops the glyph rather than rendering both.
-  if (e.state === "synced") return c(`${mark} synced`, "good", { dot: "good", label: "synced" });
-  if (e.state === "remote") return c(`${mark} remote`, "dim", { dot: "dim", label: "remote" });
-  const tone = e.external ? "dim" : "warn";
-  return c(`${mark} local`, tone, { dot: tone, label: "local" });
+  if (e.state === "synced") return c(`${mark} synced`, "good");
+  if (e.state === "remote") return c(`${mark} remote`, "dim");
+  return c(`${mark} local`, e.external ? "dim" : "warn");
 }
 
 function noteCell(e: Entry): Cell {
@@ -255,7 +252,7 @@ export function auditView(
       rows: rows.map((f) => ({
         facets: { check: title },
         cells: [
-          c(f.repo, "accent", { href: f.url ?? ghUrl(f.repo, o.login), dot: tone }),
+          c(f.repo, "accent", { href: f.url ?? ghUrl(f.repo, o.login) }),
           c(f.detail, tone),
         ],
       })),

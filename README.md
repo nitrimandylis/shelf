@@ -71,8 +71,9 @@ Every one of them takes `--json` for machines and `--html` for a browser.
 
 ## 🖥 The browser view
 
-`--html` is not the terminal table with fonts on it. It serves a page on a random
-loopback port where the counts across the top are filters, `group` buckets rows by
+`--html` serves a page on a random loopback port that looks like what the tool is:
+all monospace, on a real character grid, framed like a TUI, deep black with ANSI
+accents that only ever carry meaning. The counts across the top are `[x]` filters, `group` buckets rows by
 state or language or activity, every column header sorts, and the activity column
 is a real chart whose bars tell you the week and the commit count when you point at
 them. `/` focuses the filter, `j`/`k` move, `enter` opens the repo, `esc` clears.
