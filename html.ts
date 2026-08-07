@@ -39,6 +39,9 @@ const CSS = `
   --fs: 15px;
   --lh: 24px;
   --ease: cubic-bezier(0.22, 1, 0.36, 1);
+  /* iOS drawer curve: strong ease-out, no built-in easing is punchy enough */
+  --ease-drawer: cubic-bezier(0.32, 0.72, 0, 1);
+  --drawer-w: min(78ch, 46vw);
   --z-sticky: 100;
   color-scheme: dark;
 }
@@ -73,6 +76,13 @@ body {
   font-variant-ligatures: none;
   overflow-x: hidden;
 }
+/* The drawer is a grid column, not an overlay, so opening it genuinely narrows
+   the table instead of covering it. */
+/* overflow-x: clip, not hidden: clip does not create a scroll container, so the
+   sticky header inside .main keeps working. */
+.page { display: grid; grid-template-columns: minmax(0, 1fr) 0px; overflow-x: clip; }
+.page.open { grid-template-columns: minmax(0, 1fr) var(--drawer-w); }
+.main { min-width: 0; container-type: inline-size; container-name: main; }
 .wrap { max-width: 132ch; margin: 0 auto; padding: 2ch 2ch 6ch; }
 
 /* ------------------------------------------------------------- framing */
@@ -203,18 +213,21 @@ section.clean .note { display: none; }
 /* A panel, not a modal: the table stays visible and keeps its selection, so
    j/k walks the list with the card following along. */
 .drawer {
-  position: fixed; top: 0; right: 0; bottom: 0;
-  width: min(78ch, 52vw);
+  position: sticky; top: 0;
+  height: 100vh; overflow-y: auto; overscroll-behavior: contain;
   background: var(--bg);
   border-left: 1px solid var(--line);
-  overflow-y: auto; overscroll-behavior: contain;
-  z-index: calc(var(--z-sticky) + 10);
   padding: 2ch;
-  transform: translateX(0);
-  transition: transform 0.18s var(--ease);
+  /* Fixed inner width so the panel is revealed by the growing column rather
+     than reflowing its own contents on every frame. */
+  width: var(--drawer-w);
+  /* start, so a collapsed 0px column parks the panel off-screen to the right
+     rather than overflowing leftward across the table. */
+  justify-self: start;
 }
-.drawer[hidden] { display: block; transform: translateX(101%); visibility: hidden; }
-.drawer .frame { padding: 2ch; min-height: 100%; }
+/* Laid out but inert while closed, or an invisible panel would swallow clicks. */
+.drawer[hidden] { display: block; pointer-events: none; }
+.drawer .frame { padding: 2ch; min-height: calc(100vh - 4ch); }
 /* keep the title clear of the close button */
 .drawer section:first-child h2 { padding-right: 9ch; }
 .drawer-close { position: absolute; top: 1ch; right: 1ch; z-index: 1; border-color: transparent; color: var(--dim); }
@@ -224,7 +237,20 @@ section.clean .note { display: none; }
 .drawer h2 { position: static; transform: none; background: none; padding: 0 0 0.5ch; color: var(--dim); font-weight: 400; letter-spacing: 0.08em; border-bottom: 1px solid var(--line); }
 .drawer .legend { position: static; transform: none; background: none; padding: 0 0 0.5ch; }
 .drawer .loading { color: var(--dim); padding: 2ch 0; }
-body.drawer-open { overflow: hidden; }
+/* Motion. The column width is the layout change; the panel rides it with a
+   short translate so it reads as sliding in rather than being unveiled. */
+@media (prefers-reduced-motion: no-preference) {
+  .page { transition: grid-template-columns 280ms var(--ease-drawer); }
+  .drawer { transition: opacity 200ms var(--ease-drawer), transform 280ms var(--ease-drawer); }
+  .drawer[hidden] { opacity: 0; transform: translateX(2ch); }
+  .page.open .drawer { opacity: 1; transform: translateX(0); }
+}
+/* Reduced motion keeps the opacity change (it aids comprehension) and drops
+   every movement, per the accessibility rule. */
+@media (prefers-reduced-motion: reduce) {
+  .drawer { transition: opacity 120ms linear; }
+  .drawer[hidden] { opacity: 0; }
+}
 
 /* readme */
 .md { overflow-wrap: break-word; }
@@ -252,7 +278,12 @@ body.drawer-open { overflow: hidden; }
 .md img { max-width: 100%; }
 .md a { color: var(--cyan); border-bottom-color: var(--line); }
 
-@media (max-width: 900px) { .drawer { width: 100vw; } }
+@media (max-width: 900px) {
+  /* No room to sit side by side: the drawer takes over instead of squeezing
+     the table into an unusable column. */
+  :root { --drawer-w: 100vw; }
+  .page.open { grid-template-columns: 0px 100vw; }
+}
 
 .empty { color: var(--dim); padding: 4ch 0; text-align: center; }
 .empty strong { color: var(--ink); display: block; font-weight: 700; }
@@ -260,17 +291,20 @@ footer { color: var(--dim); margin-top: 3ch; }
 kbd { color: var(--ink); border: 1px solid var(--line); padding: 0 0.5ch; }
 
 /* ------------------------------------------------------------- responsive */
-/* Breakpoints track --fs: at 15px the eight-column table needs ~1180px of
-   content width, so these sit above that rather than at the old 13px values. */
-@media (max-width: 1280px) { [data-drop="3"] { display: none; } }
-@media (max-width: 1040px) { [data-drop="2"] { display: none; } }
-@media (max-width: 880px)  { .controls { margin-left: 0; width: 100%; } input[type=search] { flex: 1; min-width: 0; } }
+/* Container queries, not viewport queries: opening the drawer narrows the table
+   without changing the viewport, so @media would never fire and the columns
+   would squeeze instead of dropping. Thresholds track --fs — at 15px the
+   eight-column table needs ~1180px of content width. */
+@container main (max-width: 1280px) { [data-drop="3"] { display: none; } }
+@container main (max-width: 1040px) { [data-drop="2"] { display: none; } }
+@container main (max-width: 880px)  { .controls { margin-left: 0; width: 100%; } input[type=search] { flex: 1; min-width: 0; } }
+@container main (max-width: 600px) { [data-drop="1"] { display: none; } }
+
 @media (max-width: 600px) {
   /* The whole grid derives from --fs, so stepping the type down shrinks
      everything proportionally — cheaper than dropping another column, and the
      ones left (repo, age, state, note) all earn their place. */
   :root { --fs: 13px; --lh: 20px; }
-  [data-drop="1"] { display: none; }
   .wrap { padding-left: 1ch; padding-right: 1ch; }
   td, th { padding-right: 1ch; }
 }
@@ -576,17 +610,24 @@ const JS = `
   var cardToken = 0;
   var openName = null;
 
+  var page = document.getElementById('page');
+
   function closeCard() {
     openName = null;
+    page.classList.remove('open');
     drawer.hidden = true;
-    document.body.classList.remove('drawer-open');
   }
 
   function openCard(name) {
     if (!CARDS || !name) return;
+    var wasOpen = !drawer.hidden;
     openName = name;
     drawer.hidden = false;
-    document.body.classList.add('drawer-open');
+    // Reveal on the next frame so the browser has a chance to paint the closed
+    // state first; setting hidden=false and the class in the same frame skips
+    // the transition entirely.
+    if (!wasOpen) requestAnimationFrame(function () { page.classList.add('open'); });
+    else page.classList.add('open');
     drawerBody.textContent = '';
     drawerBody.appendChild(el('p', 'loading', 'loading ' + name + '\u2026'));
 
@@ -731,33 +772,37 @@ export function renderHtml(
 <style>${CSS}</style>
 </head>
 <body data-cards="${opts.refreshable ? "1" : "0"}">
-<div class="wrap">
-<header>
-  <div class="frame">
-    <h1 class="legend">${esc(view.title)}</h1>
-    <div class="bar">
-      <span class="meta" id="meta">${esc(view.meta)}</span>
-      <span class="controls">
-        <input type="search" id="filter" placeholder="filter…  (press /)" autocomplete="off" spellcheck="false" aria-label="Filter rows">
-        ${groupHtml(view)}
-        ${refresh}
-      </span>
-      <div class="warning" id="warning"${view.warning ? "" : " hidden"}>${view.warning ? "! " + esc(view.warning) : ""}</div>
+<div class="page" id="page">
+  <div class="main">
+    <div class="wrap">
+      <header>
+        <div class="frame">
+          <h1 class="legend">${esc(view.title)}</h1>
+          <div class="bar">
+            <span class="meta" id="meta">${esc(view.meta)}</span>
+            <span class="controls">
+              <input type="search" id="filter" placeholder="filter…  (press /)" autocomplete="off" spellcheck="false" aria-label="Filter rows">
+              ${groupHtml(view)}
+              ${refresh}
+            </span>
+            <div class="warning" id="warning"${view.warning ? "" : " hidden"}>${view.warning ? "! " + esc(view.warning) : ""}</div>
+          </div>
+          <div class="progress" id="progress"></div>
+        </div>
+      </header>
+      ${facetsHtml(view)}
+      <main id="views"></main>
+      <footer>
+        <kbd>/</kbd> filter · <kbd>j</kbd><kbd>k</kbd> move · <kbd>enter</kbd> card · <kbd>o</kbd> github · <kbd>esc</kbd> close · click a column to sort
+      </footer>
     </div>
-    <div class="progress" id="progress"></div>
   </div>
-</header>
-${facetsHtml(view)}
-<main id="views"></main>
-<aside class="drawer" id="drawer" hidden aria-label="Repo detail">
-  <div class="frame">
-    <button class="btn drawer-close" id="drawer-close" type="button" aria-label="Close">[ esc ]</button>
-    <div id="drawer-body"></div>
-  </div>
-</aside>
-<footer>
-  <kbd>/</kbd> filter · <kbd>j</kbd><kbd>k</kbd> move · <kbd>enter</kbd> card · <kbd>o</kbd> github · <kbd>esc</kbd> close · click a column to sort
-</footer>
+  <aside class="drawer" id="drawer" hidden aria-label="Repo detail">
+    <div class="frame">
+      <button class="btn drawer-close" id="drawer-close" type="button" aria-label="Close">[ esc ]</button>
+      <div id="drawer-body"></div>
+    </div>
+  </aside>
 </div>
 <script type="application/json" id="shelf-data">${jsonScript(view)}</script>
 <script>${JS}</script>

@@ -131,11 +131,45 @@ Focus is a 1px cyan outline, never removed.
 
 ## Motion
 
-100–250ms, `ease-out`. State only: hover, focus, the refresh progress bar.
-No page-load choreography — the page loads into a task.
+100–250ms, `ease-out`. State only: hover, focus, the refresh progress bar, and
+the card drawer. No page-load choreography — the page loads into a task.
 
-`prefers-reduced-motion: reduce` collapses every duration and stops the progress
-animation. Content is never gated behind a transition.
+**The drawer is a grid column, not an overlay.** Opening a card animates
+`grid-template-columns` from `1fr 0` to `1fr var(--drawer-w)` over 280ms on
+`cubic-bezier(0.32, 0.72, 0, 1)`, the iOS drawer curve — the built-in easings
+are too weak to read as deliberate. The panel rides that with a short
+`translateX` and an opacity fade so it slides in rather than being unveiled.
+
+Two rules this had to respect:
+
+- **`j`/`k` must not re-animate.** Walking the list with the card open is a
+  keyboard action repeated constantly, and animation on a repeated keyboard
+  action makes an interface feel slow. Only open and close transition; the
+  content swap is instant. Verified: the drawer stays at exactly one width
+  through a `j` press.
+- **This is a layout animation, which the usual rule forbids.** Transform and
+  opacity alone cannot make the table genuinely narrower, and side-by-side
+  requires it. So it was measured rather than assumed: median 6.1ms, worst
+  6.7ms, zero frames over 16.7ms across the transition with 46 rows. If that
+  ever regresses, FLIP is the fallback.
+
+Consequences worth keeping:
+
+- **Column drops are `@container`, not `@media`.** The drawer narrows the table
+  without changing the viewport, so viewport queries would never fire and the
+  columns would squeeze instead of dropping. `.main` is the container.
+- **`.page` uses `overflow-x: clip`, never `hidden`** — `clip` does not create a
+  scroll container, so the sticky header inside keeps working.
+- **The closed drawer is `justify-self: start`** so a collapsed 0px column parks
+  it off-screen right instead of overflowing leftward across the table, and it
+  is `pointer-events: none` while closed or an invisible panel would swallow
+  clicks.
+- Below 900px there is no room to split: the drawer takes the full width and the
+  table column collapses to zero.
+
+`prefers-reduced-motion: reduce` keeps the opacity fade (it aids comprehension)
+and drops every movement, per the accessibility rule. Content is never gated
+behind a transition.
 
 **A transition will lie to you when measuring.** Reading `getComputedStyle`
 immediately after setting a class returns the *interpolated* value at t=0, which
