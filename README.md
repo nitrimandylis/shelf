@@ -82,7 +82,7 @@ Click a row and a card slides in from the right: facts, language makeup, latest
 release, the activity chart, recent commits, and the README rendered in place —
 ASCII-art banners intact, because fenced code is reproduced verbatim and images
 become their alt text rather than loading. The table stays put, so `j`/`k` walks
-the list with the card following along. `o` opens GitHub, `esc` closes.
+the list with the card following along. `o` opens GitHub — or tells you why it can't, since six of your repos aren't there. `esc` closes.
 
 Refresh swaps the data in place over `/api/data` with a progress bar rather than
 reloading, because a cold GitHub fetch takes ten seconds and a page that freezes for

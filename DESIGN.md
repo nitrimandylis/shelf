@@ -134,6 +134,14 @@ Focus is a 1px cyan outline, never removed.
   count on hover.
 - **State** is a glyph plus a word (`● synced`), identical in both renderers.
   On a character grid the glyph is the marker; there is no CSS dot.
+- **Selection is state, not a side effect of `j`/`k`.** Clicking a row selects
+  it, and the selection is restored by repo name after any re-render, because
+  filtering, sorting and refresh rebuild every row. It used to reset to -1 on
+  every render, which made `o` silently do nothing on a fresh page.
+- **A key that cannot act says so.** `o` on an unpublished repo, or with nothing
+  selected, flashes a line in the warning slot for 2.6s. Silence is
+  indistinguishable from a broken keybind — which is exactly how it was
+  reported.
 - **Empty state** appears only on a filter miss. An audit where every check came
   back clean also renders zero rows, and telling the user to clear a filter they
   never set would be nonsense.

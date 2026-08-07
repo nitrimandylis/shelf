@@ -330,7 +330,7 @@ const JS = `
   if (!payload) return;
   var view = JSON.parse(payload.textContent);
   var root = document.getElementById('views');
-  var state = { q: '', facets: {}, group: '', sort: null, dir: 1, sel: -1 };
+  var state = { q: '', facets: {}, group: '', sort: null, dir: 1, sel: -1, selName: null };
 
   function el(tag, cls, text) {
     var n = document.createElement(tag);
@@ -485,6 +485,7 @@ const JS = `
       tr.style.cursor = 'pointer';
       tr.addEventListener('click', function (e) {
         if (e.target.closest('a')) return; // let a real link win
+        selectRow(tr);
         openCard(tr.getAttribute('data-name'));
       });
     }
@@ -574,13 +575,32 @@ const JS = `
       e2.appendChild(document.createTextNode('No repos were found on GitHub or on this machine.'));
       root.appendChild(e2);
     }
-    state.sel = -1;
+    // Restore the selection by name: filtering, sorting or a refresh rebuilds
+    // every row, and losing the selection would silently break o and enter.
+    var rows = visibleRows();
+    var i = state.selName ? rows.findIndex(function (r) { return r.getAttribute('data-name') === state.selName; }) : -1;
+    if (i >= 0) applySel(rows, i, false); else { state.sel = -1; }
     updateMeta();
     measureHeader();
   }
 
   function countAll() {
     return view.sections.reduce(function (a, s) { return a + s.rows.length; }, 0);
+  }
+
+  var flashTimer = null;
+  /** Transient one-liner in the warning slot. A key that legitimately cannot
+      act must say so; silence reads as a broken keybind. */
+  function flash(msg) {
+    var w = document.getElementById('warning');
+    if (!w) return;
+    w.textContent = msg;
+    w.hidden = false;
+    clearTimeout(flashTimer);
+    flashTimer = setTimeout(function () {
+      if (view.warning) { w.textContent = '! ' + view.warning; w.hidden = false; }
+      else { w.textContent = ''; w.hidden = true; }
+    }, 2600);
   }
 
   function updateMeta() {
@@ -599,14 +619,30 @@ const JS = `
     return Array.prototype.slice.call(root.querySelectorAll('tbody tr:not(.group-head)'));
   }
 
+  function applySel(rows, index, scroll) {
+    rows.forEach(function (r) { r.removeAttribute('aria-selected'); });
+    state.sel = index;
+    var r = rows[index];
+    if (!r) { state.selName = null; return null; }
+    state.selName = r.getAttribute('data-name');
+    r.setAttribute('aria-selected', 'true');
+    if (scroll) r.scrollIntoView({ block: 'nearest' });
+    return r;
+  }
+
+  function selectRow(tr) {
+    var rows = visibleRows();
+    var i = rows.indexOf(tr);
+    if (i >= 0) applySel(rows, i, false);
+  }
+
   function moveSel(delta) {
     var rows = visibleRows();
     if (!rows.length) return;
-    rows.forEach(function (r) { r.removeAttribute('aria-selected'); });
-    state.sel = Math.max(0, Math.min(rows.length - 1, state.sel + delta));
-    var r = rows[state.sel];
-    r.setAttribute('aria-selected', 'true');
-    r.scrollIntoView({ block: 'nearest' });
+    // From no selection, j starts at the top rather than doing nothing.
+    var next = state.sel < 0 ? (delta > 0 ? 0 : rows.length - 1)
+                             : Math.max(0, Math.min(rows.length - 1, state.sel + delta));
+    applySel(rows, next, true);
   }
 
   // ------------------------------------------------------------ card drawer
@@ -723,8 +759,15 @@ const JS = `
       if (CARDS) openCard(r.getAttribute('data-name'));
       else if (r.getAttribute('data-href')) window.open(r.getAttribute('data-href'), '_blank', 'noreferrer');
     } else if (e.key === 'o') {
-      var ro = selectedRow();
-      if (ro && ro.getAttribute('data-href')) window.open(ro.getAttribute('data-href'), '_blank', 'noreferrer');
+      // Prefer the repo whose card is open; fall back to the selected row.
+      var name = openName || state.selName;
+      var target = name
+        ? root.querySelector('tbody tr[data-name="' + (window.CSS && CSS.escape ? CSS.escape(name) : name) + '"]')
+        : selectedRow();
+      if (!target) { flash('nothing selected \u2014 press j or click a row first'); return; }
+      var href = target.getAttribute('data-href');
+      if (href) window.open(href, '_blank', 'noreferrer');
+      else flash(target.getAttribute('data-name') + ' is not on GitHub \u2014 nothing to open');
     }
   });
 

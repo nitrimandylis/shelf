@@ -68,7 +68,9 @@ Clicking a row (or pressing \fBEnter\fR) opens a card in a side panel: the
 repo's facts, its language makeup, latest release, activity chart, recent
 commits and its rendered README. The table stays visible and keeps its
 selection, so \fBj\fR and \fBk\fR walk the list with the card following.
-\fBo\fR opens the repo on GitHub instead, \fBEsc\fR closes the card.
+\fBo\fR opens the repo on GitHub \- the one whose card is open, or the selected
+row. Unpublished repos have no GitHub page, so \fBo\fR says so rather than
+doing nothing. \fBEsc\fR closes the card.
 .IP
 The page is a working surface, not a dump. Counts along the top double as
 filters; \fBgroup\fR buckets rows by state, language or activity; any column
