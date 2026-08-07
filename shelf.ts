@@ -304,7 +304,7 @@ async function cmdAudit(cfg: Config, flags: Flags): Promise<void> {
     return;
   }
 
-  if (flags.html) return presentHtml(build, flags);
+  if (flags.html) return presentHtml(build, flags, (name) => buildRepoView(cfg, name));
   await present(await build(flags.refresh), flags);
 }
 
@@ -503,7 +503,7 @@ async function cmdIndex(cfg: Config, flags: Flags): Promise<void> {
   }
 
   // index is the one view whose natural home is a file, so -o and --html both work
-  if (flags.html || flags.out) return presentHtml(build, flags);
+  if (flags.html || flags.out) return presentHtml(build, flags, (name) => buildRepoView(cfg, name));
   await present(await build(flags.refresh), flags);
 }
 

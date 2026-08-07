@@ -775,6 +775,15 @@ describe("renderHtml", () => {
     expect(stat).not.toContain("refresh=1");
   });
 
+  test("a page that advertises cards must have a server that can serve them", () => {
+    // audit and index shipped with data-cards="1" and no /api/repo handler, so
+    // clicking a row 404'd. The flag and the route have to agree.
+    const live = renderHtml(v, { refreshable: true });
+    const stat = renderHtml(v, { refreshable: false });
+    expect(live).toContain('data-cards="1"');
+    expect(stat).toContain('data-cards="0"');
+  });
+
   test("static export is still self-contained and inert", () => {
     const stat = renderHtml(v, { refreshable: false });
     expect(stat).not.toMatch(/<(script|link|img)[^>]+(src|href)="https?:/);
