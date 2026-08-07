@@ -24,8 +24,11 @@ Auth is `GITHUB_TOKEN` (or `GH_TOKEN`), falling back to the token from
 `gh auth token`. If neither works the tool names both and exits 1. Never read
 or echo the token.
 
-First run writes `~/.config/shelf/config.json` with defaults. Keys worth
-knowing: `scanPaths` (where to look for local repos), `activeDays` (the
+First run writes `~/.config/shelf/config.json` with defaults and prints the
+path. Keys worth knowing: `scanPaths` (where to look for local repos — defaults
+to common roots like `~/code`, `~/src`, `~/projects`, `~/Developer`, skipping
+any that do not exist; **if the user sees no local repos, this is almost always
+why**), `activeDays` (the
 warm/cold threshold, default 90), `cacheTtlMinutes` (default 60), `heavyMb`
 (default 20), `exclude`.
 
@@ -65,7 +68,11 @@ without the parsing.
 
 ## JSON shapes
 
-`shelf --json` → `{fetchedAt, cacheAgeMinutes, login, repos: [...]}`
+`shelf --json` → `{fetchedAt, cacheAgeMinutes, login, warning, scanPaths, repos: [...]}`
+
+`warning` is null when nothing is wrong. Check it before telling the user they
+have no local repos — it distinguishes a misconfigured `scanPaths` from a
+genuinely empty result.
 
 Each repo is flat. The key rule: **`null` means the field does not apply, not
 that it could not be read.** Every GitHub-side key (`visibility`, `language`,

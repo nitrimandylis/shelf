@@ -62,8 +62,9 @@ const SKIP = new Set(["node_modules", "Library", "Applications", "vendor", "targ
 
 /**
  * Find git repos under the configured roots. Descends INTO repos as well,
- * because nested project repos are real here (~/Developer/neural/sidekick)
- * and stopping at the first .git would hide them.
+ * because a repo checked out inside another repo is common enough (vendored
+ * projects, sub-projects, worktrees) that stopping at the first .git would
+ * hide them.
  */
 export function findRepos(roots: string[], maxDepth: number): string[] {
   const found: string[] = [];

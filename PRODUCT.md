@@ -113,6 +113,32 @@ stale-but-not-archived, dead homepage links, repos over 20MB (usually
 committed binaries), and local-only work. Empty sections still print, so the
 report never overstates what it looked at.
 
+## Usable by strangers
+
+The tool assumes a GitHub account and a Mac, which are product constraints. It
+must not assume *this* machine:
+
+- **Scan roots default to the conventional ones** (`~/code`, `~/src`, `~/dev`,
+  `~/Developer`, `~/projects`, `~/repos`, `~/git`, `~/work`, `~/workspace`),
+  with missing ones skipped. `~/cc` was the original default and is a fact about
+  one machine, not a sensible guess for anyone else; it now lives in that user's
+  own config file.
+- **Finding no local repos says why.** It is the most likely first-run
+  confusion, and half the point of the tool lives on that side.
+- **The first run prints where the config went**, with `~` rather than an
+  absolute path.
+- **Transient GitHub failures are retried** (two retries, 5xx and network only).
+  A first run has no cache to fall back on, so a 502 — which GitHub returns
+  often enough to have hit this build three times during testing — would
+  otherwise be a hard failure on someone's first impression. A 4xx is never
+  retried: it is an auth problem and waiting will not fix it.
+- **Every dead end names its fix**: a rejected token points at `GITHUB_TOKEN`
+  and `gh auth login`, a 403 mentions scopes, a broken config says to delete it
+  for the defaults back, an empty account explains that a token without repo
+  scope only sees public repos.
+- **Nothing global carries a personal name** — no launchd labels, no bundle ids;
+  the cache and config live under `shelf`.
+
 ## Not doing
 
 - **Writing to GitHub.** Fixing an audit finding is `gh` or `git`, not shelf.

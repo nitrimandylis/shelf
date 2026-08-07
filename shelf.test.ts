@@ -20,6 +20,7 @@ import {
   type LocalRepo,
 } from "./model.ts";
 import { parseStatus, parseRemote, findRepos } from "./local.ts";
+import { DEFAULT_SCAN_PATHS, DEFAULTS, shortenHome, expandTilde } from "./config.ts";
 import { parseArgs } from "./shelf.ts";
 import { triageView, auditView, indexView, showView } from "./views.ts";
 import { renderView } from "./term.ts";
@@ -503,6 +504,16 @@ describe("triageView", () => {
     expect(note.tone).toBe("warn");
   });
 
+  test("an empty account gets an explanation, not a bare header", () => {
+    const v = triageView([], viewOpts);
+    const text = v.sections.flatMap((s) => s.rows).map((r) => r.cells[0]!.text).join(" ");
+    expect(text).toContain("No repos found");
+    // the two things that actually cause it
+    expect(text).toContain("repo scope");
+    expect(text).toContain("scanPaths");
+    expect(v.sections.some((s) => s.kind === "table")).toBe(false);
+  });
+
   test("a local-only repo gets a sparkline from its own log", () => {
     const e = mergeEntries(
       [],
@@ -948,5 +959,49 @@ describe("showView with card extras", () => {
     const view = showView(e[0]!, [], { login: "n", now: NOW, meta: "t" });
     expect(view.sections.some((s) => s.kind === "markdown")).toBe(false);
     expect(view.sections.some((s) => s.title === "readme")).toBe(false);
+  });
+});
+
+
+// ---------------------------------------------------------------- strangers
+
+describe("usable by strangers", () => {
+  test("no personal path is baked into the defaults", () => {
+    // ~/cc was the original default and is a fact about one machine, not a
+    // sensible guess for anyone else.
+    const personal = [/\/cc\b/, /nick/i, /nitrimandylis/i];
+    for (const path of DEFAULT_SCAN_PATHS) {
+      for (const bad of personal) expect(path).not.toMatch(bad);
+    }
+  });
+
+  test("scan roots are conventional and tilde-relative", () => {
+    for (const path of DEFAULT_SCAN_PATHS) expect(path.startsWith("~/")).toBe(true);
+    expect(DEFAULT_SCAN_PATHS).toContain("~/code");
+    expect(DEFAULT_SCAN_PATHS).toContain("~/src");
+    expect(DEFAULT_SCAN_PATHS).toContain("~/projects");
+    // several roots cost nothing because missing ones are skipped
+    expect(DEFAULT_SCAN_PATHS.length).toBeGreaterThan(4);
+  });
+
+  test("every default is a value anyone could live with", () => {
+    expect(DEFAULTS.scanDepth).toBeGreaterThanOrEqual(2);
+    expect(DEFAULTS.activeDays).toBeGreaterThan(0);
+    expect(DEFAULTS.cacheTtlMinutes).toBeGreaterThan(0);
+    expect(DEFAULTS.heavyMb).toBeGreaterThan(0);
+    expect(DEFAULTS.exclude).toEqual([]);
+  });
+
+  test("missing scan roots are skipped rather than throwing", () => {
+    // the normal case on someone else's machine: most roots do not exist
+    expect(findRepos(DEFAULT_SCAN_PATHS.map((p) => p + "-definitely-not-here"), 2)).toEqual([]);
+  });
+
+  test("shortenHome round-trips with expandTilde", () => {
+    const expanded = expandTilde("~/.config/shelf/config.json");
+    expect(expanded.startsWith("~")).toBe(false);
+    expect(shortenHome(expanded)).toBe("~/.config/shelf/config.json");
+    // a path outside home is left alone
+    expect(shortenHome("/etc/hosts")).toBe("/etc/hosts");
   });
 });

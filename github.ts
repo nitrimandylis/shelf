@@ -16,7 +16,7 @@ export type Cache = {
 
 /**
  * GITHUB_TOKEN first so a stranger (or CI) can set one, falling back to the
- * token gh already holds so Nick never has to manage a secret for this.
+ * token gh already holds, so nobody has to manage a secret just for this.
  */
 export function githubToken(): string {
   const env = process.env.GITHUB_TOKEN || process.env.GH_TOKEN;
@@ -123,31 +123,72 @@ function normalize(n: GqlNode): Repo {
   };
 }
 
-async function gql(token: string, query: string, variables: Record<string, unknown>) {
-  const res = await fetch(API, {
-    method: "POST",
-    headers: {
-      authorization: `bearer ${token}`,
-      "content-type": "application/json",
-      "user-agent": "shelf",
-    },
-    body: JSON.stringify({ query, variables }),
-  });
+const RETRY_DELAYS_MS = [400, 1200];
 
-  // GitHub answers GraphQL errors with HTTP 200 and a valid JSON body, so the
-  // status check alone is not enough — always look at body.errors too.
-  let body: any;
-  try {
-    body = await res.json();
-  } catch {
-    throw new Error(`GitHub returned non-JSON (HTTP ${res.status})`);
+/**
+ * One GraphQL round trip, retried on transient failure.
+ *
+ * GitHub returns 502s often enough that a first run — which has no cache to
+ * fall back on — would otherwise fail outright on a blip. Only 5xx and network
+ * errors are retried: a 4xx is an auth or permission problem and retrying it
+ * just makes the user wait longer for the same answer.
+ */
+async function gql(token: string, query: string, variables: Record<string, unknown>) {
+  let lastError: Error | null = null;
+
+  for (let attempt = 0; attempt <= RETRY_DELAYS_MS.length; attempt++) {
+    if (attempt > 0) await Bun.sleep(RETRY_DELAYS_MS[attempt - 1]!);
+
+    let res: Response;
+    try {
+      res = await fetch(API, {
+        method: "POST",
+        headers: {
+          authorization: `bearer ${token}`,
+          "content-type": "application/json",
+          "user-agent": "shelf",
+        },
+        body: JSON.stringify({ query, variables }),
+      });
+    } catch (err) {
+      lastError = new Error(`could not reach GitHub: ${err instanceof Error ? err.message : String(err)}`);
+      continue; // network failure: worth another go
+    }
+
+    // GitHub answers GraphQL errors with HTTP 200 and a valid JSON body, so the
+    // status check alone is not enough — always look at body.errors too.
+    let body: any;
+    try {
+      body = await res.json();
+    } catch {
+      if (res.status >= 500) {
+        lastError = new Error(`GitHub returned non-JSON (HTTP ${res.status})`);
+        continue;
+      }
+      throw new Error(`GitHub returned non-JSON (HTTP ${res.status})`);
+    }
+
+    if (body?.errors?.length) {
+      throw new Error(body.errors.map((e: GqlNode) => e.message).join("; "));
+    }
+    if (res.status >= 500) {
+      lastError = new Error(`GitHub API HTTP ${res.status} ${res.statusText}`);
+      continue;
+    }
+    if (!res.ok) {
+      const hint =
+        res.status === 401
+          ? " — the token was rejected; check GITHUB_TOKEN or run: gh auth login"
+          : res.status === 403
+            ? " — forbidden; the token may lack the scopes to read your repos"
+            : "";
+      throw new Error(`GitHub API HTTP ${res.status} ${res.statusText}${hint}`);
+    }
+    if (!body?.data?.viewer) throw new Error("GitHub response had no viewer data");
+    return body.data;
   }
-  if (body?.errors?.length) {
-    throw new Error(body.errors.map((e: GqlNode) => e.message).join("; "));
-  }
-  if (!res.ok) throw new Error(`GitHub API HTTP ${res.status} ${res.statusText}`);
-  if (!body?.data?.viewer) throw new Error("GitHub response had no viewer data");
-  return body.data;
+
+  throw new Error(`${lastError?.message ?? "GitHub request failed"} (after ${RETRY_DELAYS_MS.length + 1} tries)`);
 }
 
 export async function fetchRepos(now = Date.now()): Promise<Cache> {

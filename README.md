@@ -104,7 +104,8 @@ shelf
 man shelf         # full reference, offline
 ```
 
-First run writes `~/.config/shelf/config.json` and takes about ten seconds while
+First run writes `~/.config/shelf/config.json` (and tells you where), then takes
+about ten seconds while
 GitHub thinks about it. Every run after that is 0.1s until the cache turns an hour
 old. Most of that cold cost is the eight weekly commit counts — metadata alone
 returns in four.

@@ -194,6 +194,28 @@ export function triageView(entries: Entry[], o: TriageOpts): View {
     { label: "note", flex: true },
   ];
 
+  // Nothing at all is ambiguous between an empty account and a token that can
+  // only see public repos, so say both rather than showing a bare header.
+  if (!entries.length) {
+    return {
+      title: "SHELF",
+      meta: o.meta,
+      warning: o.warning,
+      sections: [
+        {
+          kind: "lines",
+          rows: [
+            { cells: [c("No repos found.", "warn")] },
+            { cells: [c("", "dim")] },
+            { cells: [c("A token without repo scope only sees public repos.", "dim")] },
+            { cells: [c("Check GITHUB_TOKEN, or run: gh auth login", "dim")] },
+            { cells: [c("Local repos come from scanPaths in the config file.", "dim")] },
+          ],
+        },
+      ],
+    };
+  }
+
   const sections: Section[] = [
     {
       kind: "table",

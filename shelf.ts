@@ -1,5 +1,5 @@
 #!/usr/bin/env bun
-import { loadConfig, configPath, type Config } from "./config.ts";
+import { loadConfig, configPath, shortenHome, type Config } from "./config.ts";
 import { loadRepos, fetchRepoDetail, checkLinks, type CommitLine } from "./github.ts";
 import { scanLocal, recentCommits, localReadme } from "./local.ts";
 import { mergeEntries, auditOffline, relTime, type Entry, type AuditReport } from "./model.ts";
@@ -100,7 +100,15 @@ async function gather(cfg: Config, force: boolean, now = Date.now()): Promise<Ga
   // Degrade rather than die, but say so: without git the local half of the
   // whole premise is missing, and silence looks like "you have no local repos".
   const warnings = [repoLoad.warning];
-  if (!Bun.which("git")) warnings.push("git is not on PATH, so no local repos were scanned");
+  if (!Bun.which("git")) {
+    warnings.push("git is not on PATH, so no local repos were scanned");
+  } else if (locals.length === 0) {
+    // Half the point of the tool is the local side. Finding nothing usually
+    // means the scan roots are wrong, not that there is nothing to find.
+    warnings.push(
+      `no local repos found — set scanPaths in ${shortenHome(configPath())}`,
+    );
+  }
 
   return {
     cfg,
@@ -242,6 +250,10 @@ async function cmdTriage(cfg: Config, flags: Flags): Promise<void> {
       fetchedAt: g.fetchedAt,
       cacheAgeMinutes: Math.round(g.cacheAgeMinutes * 10) / 10,
       login: g.login,
+      // null when nothing is wrong. Tells a consumer the difference between
+      // "no local clones" and "the scan roots are misconfigured".
+      warning: g.warning ?? null,
+      scanPaths: g.cfg.scanPaths,
       repos: g.entries.map(entryJson),
     });
     return;
@@ -423,6 +435,11 @@ async function main(): Promise<void> {
 
   const { cmd, args, flags } = parseArgs(argv);
   const cfg = await loadConfig();
+
+  // First run: say where the knobs are. On stderr so --json stays clean.
+  if (cfg.created && !flags.json) {
+    console.error(`wrote default config to ${shortenHome(configPath())}`);
+  }
 
   switch (cmd) {
     case "triage":

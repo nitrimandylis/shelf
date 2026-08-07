@@ -138,8 +138,12 @@ written to disk by shelf.
 .SH FILES
 .TP
 .I ~/.config/shelf/config.json
-Written with defaults on first run. Keys: \fBscanPaths\fR (roots to scan,
-tilde allowed), \fBscanDepth\fR (how deep to walk, default 2), \fBactiveDays\fR
+Written with defaults on first run, and the path is printed the first time.
+Keys: \fBscanPaths\fR (roots to scan, tilde allowed; defaults to the common
+ones \- \fI~/code\fR, \fI~/src\fR, \fI~/dev\fR, \fI~/Developer\fR,
+\fI~/projects\fR, \fI~/repos\fR, \fI~/git\fR, \fI~/work\fR and
+\fI~/workspace\fR \- with missing ones skipped, so set this if your code lives
+elsewhere), \fBscanDepth\fR (how deep to walk, default 2), \fBactiveDays\fR
 (the warm/cold threshold, default 90), \fBcacheTtlMinutes\fR (default 60),
 \fBheavyMb\fR (default 20), \fBexclude\fR (repo names to drop entirely).
 .TP
@@ -153,7 +157,10 @@ with a non-zero exit, so consumers branch on the exit code rather than parsing
 error output.
 .TP
 .B shelf \-\-json
-\fB{fetchedAt, cacheAgeMinutes, login, repos: []}\fR. Each repo is flat.
+\fB{fetchedAt, cacheAgeMinutes, login, warning, scanPaths, repos: []}\fR.
+\fBwarning\fR is null when nothing is wrong; it is how a consumer tells
+"no local clones" apart from "the scan roots are misconfigured". Each repo is
+flat.
 Every GitHub-side key (\fBvisibility\fR, \fBlanguage\fR, \fBcommits8w\fR,
 \fBweeks\fR, \fBci\fR, ...) is \fBnull\fR when the repo is local-only, and
 every local-side key (\fBpath\fR, \fBbranch\fR, \fBdirty\fR, \fBahead\fR,
