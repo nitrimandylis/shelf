@@ -41,7 +41,7 @@ const CSS = `
   --ease: cubic-bezier(0.22, 1, 0.36, 1);
   /* iOS drawer curve: strong ease-out, no built-in easing is punchy enough */
   --ease-drawer: cubic-bezier(0.32, 0.72, 0, 1);
-  --drawer-w: min(78ch, 46vw);
+  --drawer-w: min(92ch, 52vw);
   --z-sticky: 100;
   color-scheme: dark;
 }
@@ -227,9 +227,10 @@ section.clean .note { display: none; }
 }
 /* Laid out but inert while closed, or an invisible panel would swallow clicks. */
 .drawer[hidden] { display: block; pointer-events: none; }
-.drawer .frame { padding: 2ch; min-height: calc(100vh - 4ch); }
+.drawer > .frame { padding: 2ch; min-height: calc(100vh - 4ch); }
 /* keep the title clear of the close button */
 .drawer section:first-child h2 { padding-right: 9ch; }
+.drawer section > .frame { padding: 0; border: 0; min-height: 0; }
 .drawer-close { position: absolute; top: 1ch; right: 1ch; z-index: 1; border-color: transparent; color: var(--dim); }
 .drawer-close:hover { color: var(--ink); }
 .drawer section { margin: 0 0 2.5ch; }
@@ -722,11 +723,19 @@ const JS = `
     }
   });
 
+  // The column headers stick beneath the page header, so the offset has to track
+  // the header's real height. It changes without a window resize: opening the
+  // drawer narrows the header and re-wraps its controls. Observe the element
+  // itself rather than guessing at the events that might have changed it.
+  var headerEl = document.querySelector('header');
   function measureHeader() {
-    var h = document.querySelector('header');
-    if (h) document.documentElement.style.setProperty('--head-h', h.offsetHeight + 'px');
+    if (headerEl) document.documentElement.style.setProperty('--head-h', headerEl.offsetHeight + 'px');
   }
-  window.addEventListener('resize', measureHeader);
+  if (headerEl && window.ResizeObserver) {
+    new ResizeObserver(measureHeader).observe(headerEl);
+  } else {
+    window.addEventListener('resize', measureHeader);
+  }
 
   render();
   measureHeader();

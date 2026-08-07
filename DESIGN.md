@@ -101,8 +101,11 @@ Rows are exactly one `--lh`.
   readers.
 - Section titles sit in the frame as a legend notch, absolutely positioned with
   a background matching the ground.
-- Sticky header; column headers stick beneath it at a `--head-h` measured in JS,
-  because the header's height changes when a warning appears.
+- Sticky header; column headers stick beneath it at a `--head-h` measured in JS
+  by a **ResizeObserver on the header element**, not a window-resize listener.
+  The header's height changes without the window resizing — a warning appears,
+  or the drawer opens and re-wraps its controls (57px → 85px). Observe the
+  element, don't guess at the events that might have changed it.
 - Responsive is structural: columns drop by priority (`lang`/`iss` at 1280px,
   `commits` at 1040, the chart at 600). **`note` never drops** — it carries
   UNPUBLISHED, dirty and failing CI, the reason to open the page at all.
@@ -160,6 +163,11 @@ Consequences worth keeping:
   columns would squeeze instead of dropping. `.main` is the container.
 - **`.page` uses `overflow-x: clip`, never `hidden`** — `clip` does not create a
   scroll container, so the sticky header inside keeps working.
+- **`.drawer > .frame`, never `.drawer .frame`.** Each section inside the drawer
+  has its own `.frame`, so the unscoped selector gave every one of them the
+  outer panel's `min-height: calc(100vh - 4ch)` and buried the README a full
+  viewport below the fold. It went unnoticed while the value was `100%`, which
+  resolved to auto and did nothing.
 - **The closed drawer is `justify-self: start`** so a collapsed 0px column parks
   it off-screen right instead of overflowing leftward across the table, and it
   is `pointer-events: none` while closed or an invisible panel would swallow
