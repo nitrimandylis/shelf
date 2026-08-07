@@ -1,11 +1,12 @@
 #!/usr/bin/env bun
 import { loadConfig, configPath, type Config } from "./config.ts";
-import { loadRepos, fetchRecentCommits, checkLinks, type CommitLine } from "./github.ts";
-import { scanLocal, recentCommits } from "./local.ts";
+import { loadRepos, fetchRepoDetail, checkLinks, type CommitLine } from "./github.ts";
+import { scanLocal, recentCommits, localReadme } from "./local.ts";
 import { mergeEntries, auditOffline, relTime, type Entry, type AuditReport } from "./model.ts";
-import { triageView, auditView, showView, indexView, type View } from "./views.ts";
+import { triageView, auditView, showView, indexView, type View, type ShowExtras } from "./views.ts";
 import { renderView } from "./term.ts";
 import { renderHtml, serveView } from "./html.ts";
+import { renderMarkdown } from "./markdown.ts";
 
 const VERSION = "0.1.0";
 
@@ -172,13 +173,16 @@ async function present(view: View, flags: Flags): Promise<void> {
 async function presentHtml(
   build: (force: boolean) => Promise<View>,
   flags: Flags,
+  repo?: (name: string) => Promise<View>,
 ): Promise<void> {
   if (flags.out) {
+    // A static file has no server to answer card requests, so it ships without
+    // them; rows fall back to opening the repo on GitHub.
     await Bun.write(flags.out, renderHtml(await build(flags.refresh), { refreshable: false }));
     console.error(`wrote ${flags.out}`);
     return;
   }
-  await serveView(build, { open: flags.open });
+  await serveView(build, { open: flags.open, repo });
 }
 
 // ---------------------------------------------------------------- audit
@@ -243,7 +247,7 @@ async function cmdTriage(cfg: Config, flags: Flags): Promise<void> {
     return;
   }
 
-  if (flags.html) return presentHtml(build, flags);
+  if (flags.html) return presentHtml(build, flags, (name) => buildRepoView(cfg, name));
   await present(await build(flags.refresh), flags);
 }
 
@@ -279,16 +283,37 @@ async function cmdAudit(cfg: Config, flags: Flags): Promise<void> {
   await present(await build(flags.refresh), flags);
 }
 
-async function loadCommits(e: Entry): Promise<{ commits: CommitLine[]; error?: string }> {
+/**
+ * Everything behind a repo card. GitHub answers for published repos; a repo
+ * that only exists on this machine still gets its commits and README, read
+ * straight off disk.
+ */
+async function loadDetail(
+  e: Entry,
+): Promise<{ commits: CommitLine[]; extra: ShowExtras; error?: string }> {
   if (e.gh) {
     try {
-      return { commits: await fetchRecentCommits(e.gh.name) };
+      const d = await fetchRepoDetail(e.gh.name);
+      return {
+        commits: d.commits,
+        extra: {
+          readmeHtml: d.readme ? renderMarkdown(d.readme) : null,
+          languages: d.languages,
+          latestRelease: d.latestRelease,
+        },
+      };
     } catch (err) {
-      return { commits: [], error: err instanceof Error ? err.message : String(err) };
+      return { commits: [], extra: {}, error: err instanceof Error ? err.message : String(err) };
     }
   }
-  if (e.local) return { commits: await recentCommits(e.local.path, 8) };
-  return { commits: [] };
+  if (e.local) {
+    const raw = await localReadme(e.local.path);
+    return {
+      commits: await recentCommits(e.local.path, 10),
+      extra: { readmeHtml: raw ? renderMarkdown(raw) : null },
+    };
+  }
+  return { commits: [], extra: {} };
 }
 
 async function cmdShow(cfg: Config, flags: Flags, name: string | undefined): Promise<void> {
@@ -311,22 +336,52 @@ async function cmdShow(cfg: Config, flags: Flags, name: string | undefined): Pro
     return;
   }
 
-  const { commits, error } = await loadCommits(entry);
+  const { commits, extra, error } = await loadDetail(entry);
 
   if (flags.json) {
-    emit({ ...entryJson(entry), recentCommits: commits });
+    emit({
+      ...entryJson(entry),
+      recentCommits: commits,
+      languages: extra.languages ?? null,
+      latestRelease: extra.latestRelease ?? null,
+      hasReadmeBody: extra.readmeHtml != null,
+    });
     return;
   }
 
-  const view = showView(entry, commits, {
-    login: g.login,
-    now: Date.now(),
-    meta: g.meta,
-    commitError: error ? `could not load commits: ${error}` : undefined,
-  });
+  const view = showView(
+    entry,
+    commits,
+    {
+      login: g.login,
+      now: Date.now(),
+      meta: g.meta,
+      commitError: error ? `could not load commits: ${error}` : undefined,
+    },
+    extra,
+  );
 
   if (flags.html) return presentHtml(async () => view, flags);
   await present(view, flags);
+}
+
+/** The card payload: the same View model the page already knows how to draw. */
+async function buildRepoView(cfg: Config, name: string): Promise<View> {
+  const g = await gather(cfg, false);
+  const entry = g.entries.find((e) => e.name.toLowerCase() === name.toLowerCase());
+  if (!entry) throw new Error(`no repo named "${name}"`);
+  const { commits, extra, error } = await loadDetail(entry);
+  return showView(
+    entry,
+    commits,
+    {
+      login: g.login,
+      now: Date.now(),
+      meta: g.meta,
+      commitError: error ? `could not load commits: ${error}` : undefined,
+    },
+    extra,
+  );
 }
 
 async function cmdIndex(cfg: Config, flags: Flags): Promise<void> {

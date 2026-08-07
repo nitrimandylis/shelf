@@ -24,6 +24,7 @@ import { parseArgs } from "./shelf.ts";
 import { triageView, auditView, indexView, showView } from "./views.ts";
 import { renderView } from "./term.ts";
 import { renderHtml, jsonScript } from "./html.ts";
+import { renderMarkdown, safeUrl, escapeHtml } from "./markdown.ts";
 
 // ---------------------------------------------------------------- fixtures
 
@@ -680,6 +681,17 @@ describe("renderView", () => {
     expect(out).toContain("SHELF");
   });
 
+  test("a markdown section becomes a pointer, never a raw README dump", () => {
+    const e = mergeEntries([repo({ name: "x" })], [], "n");
+    const view = showView(e[0]!, [], { login: "n", now: NOW, meta: "t" }, {
+      readmeHtml: "<p>" + "x".repeat(5000) + "</p>",
+    });
+    const out = renderView(view, { width: 100, color: false });
+    expect(out).toContain("read it with --html");
+    expect(out).not.toContain("xxxxx");
+    expect(out.split("\n").length).toBeLessThan(40);
+  });
+
   test("renders an audit with empty sections as ticks", () => {
     const view = auditView(
       { hygiene: [], stale: [], heavy: [], unpublished: [], deadLinks: [], skippedPrivate: 8 },
@@ -772,5 +784,169 @@ describe("renderHtml", () => {
     const html = renderHtml(mixed);
     expect(html).toContain("pub");
     expect(html).not.toContain("secret");
+  });
+});
+
+
+// ---------------------------------------------------------------- markdown
+
+describe("renderMarkdown", () => {
+  test("headings, paragraphs and lists", () => {
+    const h = renderMarkdown("# Title\n\nSome text.\n\n- one\n- two\n");
+    expect(h).toContain("<h1>Title</h1>");
+    expect(h).toContain("<p>Some text.</p>");
+    expect(h).toContain("<ul><li>one</li><li>two</li></ul>");
+  });
+
+  test("ordered lists stay ordered and do not merge with bullets", () => {
+    const h = renderMarkdown("1. first\n2. second\n\n- bullet\n");
+    expect(h).toContain("<ol><li>first</li><li>second</li></ol>");
+    expect(h).toContain("<ul><li>bullet</li></ul>");
+  });
+
+  test("code fences are preserved verbatim, ASCII art included", () => {
+    const art = "\u2588\u2588\u2557  *not emphasis*  # not a heading";
+    const h = renderMarkdown("```\n" + art + "\n```\n");
+    expect(h).toContain("<pre><code>");
+    expect(h).toContain("*not emphasis*");
+    expect(h).not.toContain("<em>");
+    expect(h).not.toContain("<h1>");
+  });
+
+  test("inline code is not reformatted", () => {
+    const h = renderMarkdown("use `**not bold**` here");
+    expect(h).toContain("<code>**not bold**</code>");
+    expect(h).not.toContain("<strong>");
+  });
+
+  test("emphasis and strong", () => {
+    expect(renderMarkdown("**bold** and *italic*")).toContain("<strong>bold</strong>");
+    expect(renderMarkdown("**bold** and *italic*")).toContain("<em>italic</em>");
+  });
+
+  test("tables render with a header row", () => {
+    const h = renderMarkdown("| a | b |\n|---|---|\n| 1 | 2 |\n");
+    expect(h).toContain("<th>a</th>");
+    expect(h).toContain("<td>1</td>");
+    expect(h).not.toContain("---");
+  });
+
+  test("links are rendered, images become their alt text", () => {
+    const h = renderMarkdown("[docs](https://example.com) ![badge](https://img.shields.io/x)");
+    expect(h).toContain('<a href="https://example.com"');
+    expect(h).toContain("[badge]");
+    // no image is ever loaded: the page makes no external requests
+    expect(h).not.toContain("<img");
+  });
+
+  test("relative links degrade to text rather than breaking", () => {
+    const h = renderMarkdown("see [the licence](LICENSE)");
+    expect(h).toContain("the licence");
+    expect(h).not.toContain("<a href");
+  });
+
+  // ---- the security boundary
+  test("script tags in a README cannot execute", () => {
+    const h = renderMarkdown("hello <script>alert(1)</script> world");
+    expect(h).not.toContain("<script");
+    expect(h).not.toContain("alert(1)</script>");
+  });
+
+  test("javascript: and data: urls are refused", () => {
+    expect(safeUrl("javascript:alert(1)")).toBeNull();
+    expect(safeUrl("data:text/html,<script>")).toBeNull();
+    expect(safeUrl("  https://ok.example  ")).toBe("https://ok.example");
+    expect(safeUrl("mailto:a@b.c")).toBe("mailto:a@b.c");
+    const h = renderMarkdown("[click](javascript:alert(1))");
+    expect(h).not.toContain("javascript:");
+  });
+
+  test("an onerror attribute cannot survive into the output", () => {
+    const h = renderMarkdown('<img src=x onerror="alert(1)"> and <div onclick="x()">text</div>');
+    expect(h).not.toContain("onerror");
+    expect(h).not.toContain("onclick");
+  });
+
+  test("angle brackets in prose are escaped, not dropped", () => {
+    expect(renderMarkdown("a < b && c > d")).toContain("&lt;");
+    expect(renderMarkdown("a < b && c > d")).toContain("&amp;&amp;");
+  });
+
+  test("escapeHtml covers the four dangerous characters", () => {
+    expect(escapeHtml('<a href="x">&</a>')).toBe("&lt;a href=&quot;x&quot;&gt;&amp;&lt;/a&gt;");
+  });
+
+  test("empty or whitespace input renders nothing", () => {
+    expect(renderMarkdown("")).toBe("");
+    expect(renderMarkdown("   \n\n  ")).toBe("");
+  });
+
+  test("a real README shape survives end to end", () => {
+    const src = [
+      "```",
+      "  \u2588\u2588\u2557",
+      "```",
+      "",
+      "<div align=\"center\">",
+      "",
+      "### `A TAGLINE`",
+      "",
+      "![badge](https://img.shields.io/badge/x-y)",
+      "",
+      "</div>",
+      "",
+      "---",
+      "",
+      "## What is this",
+      "",
+      "A tool. See [docs](https://example.com).",
+      "",
+      "| col | what |",
+      "|---|---|",
+      "| 01 | does a thing |",
+    ].join("\n");
+    const h = renderMarkdown(src);
+    expect(h).toContain("<pre><code>");
+    expect(h).toContain("<h3>");
+    expect(h).toContain("<h2>What is this</h2>");
+    expect(h).toContain("<hr>");
+    expect(h).toContain("<th>col</th>");
+    expect(h).toContain("[badge]");
+    expect(h).not.toContain("<div");
+    expect(h).not.toContain("align=");
+  });
+});
+
+describe("showView with card extras", () => {
+  test("a README becomes a markdown section carrying html", () => {
+    const e = mergeEntries([repo({ name: "x" })], [], "n");
+    const view = showView(e[0]!, [], { login: "n", now: NOW, meta: "t" }, {
+      readmeHtml: "<p>hi</p>",
+      languages: [{ name: "TypeScript", pct: 75 }],
+      latestRelease: { tag: "v1.0.0", publishedAt: "2026-01-02T00:00:00Z" },
+    });
+    const md = view.sections.find((s) => s.kind === "markdown")!;
+    expect(md.html).toBe("<p>hi</p>");
+    expect(md.title).toBe("readme");
+
+    const facts = view.sections.find((s) => s.kind === "facts")!;
+    const text = facts.rows.map((r) => r.cells.map((c) => c.text).join(" ")).join("\n");
+    expect(text).toContain("TypeScript 75%");
+    expect(text).toContain("v1.0.0");
+  });
+
+  test("a repo with no README says so instead of showing an empty panel", () => {
+    const e = mergeEntries([repo({ name: "x" })], [], "n");
+    const view = showView(e[0]!, [], { login: "n", now: NOW, meta: "t" }, { readmeHtml: null });
+    const last = view.sections[view.sections.length - 1]!;
+    expect(last.title).toBe("readme");
+    expect(last.rows[0]!.cells[0]!.text).toContain("no README");
+  });
+
+  test("extras are optional: show still works without them", () => {
+    const e = mergeEntries([repo({ name: "x" })], [], "n");
+    const view = showView(e[0]!, [], { login: "n", now: NOW, meta: "t" });
+    expect(view.sections.some((s) => s.kind === "markdown")).toBe(false);
+    expect(view.sections.some((s) => s.title === "readme")).toBe(false);
   });
 });

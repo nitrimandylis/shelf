@@ -84,6 +84,20 @@ feeding two renderers rather than four bespoke pages.
   fetches `/api/data`, shows a progress indicator and swaps in place. A page
   that freezes for ten seconds reads as broken, and reloading would do exactly
   that.
+- **Per-repo cards are a side panel, not a modal.** The table stays visible and
+  keeps its selection, so `j`/`k` walks the list with the card following. A
+  modal would hide the list you are triaging against, and product UI should
+  exhaust inline alternatives before reaching for one.
+- **Cards are lazy and bounded.** One live GitHub call (~0.75s) when a card
+  opens, never 46 calls up front. A newer card always wins: a slow earlier
+  request cannot overwrite it.
+- **The README is rendered on the server, not in the page.** It is markdown from
+  an untrusted-shaped source, so it is escaped first and only a fixed set of
+  tags is ever emitted. Rendering it in TypeScript also makes it unit-testable,
+  which a renderer buried in a client-JS string would not be.
+- **Images are never loaded.** An image becomes its alt text in brackets, which
+  keeps a badge row informative and keeps the promise that the page makes no
+  network requests.
 - **A refresh that silently fell back to cache still says so.** The payload
   carries the warning and the client re-renders it, or stale data would look
   current.

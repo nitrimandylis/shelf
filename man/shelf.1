@@ -64,6 +64,12 @@ below.
 Render in a browser. Starts a server on a random port bound to 127.0.0.1,
 opens it, and runs until interrupted.
 .IP
+Clicking a row (or pressing \fBEnter\fR) opens a card in a side panel: the
+repo's facts, its language makeup, latest release, activity chart, recent
+commits and its rendered README. The table stays visible and keeps its
+selection, so \fBj\fR and \fBk\fR walk the list with the card following.
+\fBo\fR opens the repo on GitHub instead, \fBEsc\fR closes the card.
+.IP
 The page is a working surface, not a dump. Counts along the top double as
 filters; \fBgroup\fR buckets rows by state, language or activity; any column
 header sorts; the activity column is drawn as a real chart whose bars name their
@@ -79,7 +85,8 @@ JavaScript. Everything is inline: no network request is made to render it.
 .BR \-o ", " \-\-out " " \fIFILE\fR
 Write the HTML to \fIFILE\fR instead of serving it. The written page is static:
 it keeps filtering, grouping, sorting and the charts, but has no refresh button
-and needs no server.
+and needs no server. Cards need a server to answer, so rows in a written file
+open the repo on GitHub instead.
 .TP
 .B \-\-no\-open
 With \fB\-\-html\fR, do not launch the browser.
@@ -101,6 +108,15 @@ Show help and exit.
 .TP
 .BR \-V ", " \-\-version
 Show version and exit.
+.SH README RENDERING
+Cards render the README with a small built-in markdown renderer. Fenced code is
+reproduced verbatim, so ASCII-art banners survive. Images are never loaded: an
+image becomes its alt text in brackets, which keeps a badge row readable and
+keeps the page free of network requests. Raw HTML in the source is stripped
+rather than shown as tag soup, and only absolute http(s) and mailto links are
+kept \- relative links render as plain text, since a drawer has no base to
+resolve them against. The markdown is escaped before any formatting is applied
+and only a fixed set of tags is ever emitted.
 .SH SPARKLINE
 The eight-week bar is scaled to that repo's own busiest week, so it shows the
 shape of activity, not its magnitude; the adjacent commit count carries the

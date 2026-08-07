@@ -29,12 +29,14 @@ export type Column = { label: string; align?: "left" | "right"; flex?: boolean; 
 /** `facets` are what the browser filters and groups on. The terminal ignores them. */
 export type Row = { cells: Cell[]; facets?: Record<string, string> };
 
-export type SectionKind = "table" | "lines" | "facts" | "timeline";
+export type SectionKind = "table" | "lines" | "facts" | "timeline" | "markdown";
 
 export type Section = {
   title?: string;
   note?: string;
   kind?: SectionKind;
+  /** markdown sections only: server-rendered, safe-by-construction HTML. */
+  html?: string;
   clean?: boolean; // a check that found nothing; browser renders it compactly
   columns?: Column[];
   rows: Row[];
@@ -285,10 +287,17 @@ export function auditView(
 
 // ---------------------------------------------------------------- show
 
+export type ShowExtras = {
+  readmeHtml?: string | null;
+  languages?: { name: string; pct: number }[];
+  latestRelease?: { tag: string; publishedAt: string } | null;
+};
+
 export function showView(
   e: Entry,
   commits: CommitLine[],
   o: { login: string; now: number; meta: string; commitError?: string },
+  extra: ShowExtras = {},
 ): View {
   const gh = e.gh;
   const sections: Section[] = [];
@@ -307,6 +316,12 @@ export function showView(
     fact("topics", gh.topics.length ? gh.topics.join(" ") : "none", gh.topics.length ? "plain" : "warn");
     fact("open", `${gh.openIssues} issues · ${gh.openPRs} PRs`);
     fact("stars", String(gh.stars));
+    if (extra.languages?.length) {
+      fact("makeup", extra.languages.map((l) => `${l.name} ${l.pct}%`).join("  "));
+    }
+    if (extra.latestRelease) {
+      fact("release", `${extra.latestRelease.tag} · ${extra.latestRelease.publishedAt.slice(0, 10)}`);
+    }
     if (gh.ci) fact("CI", gh.ci, gh.ci === "SUCCESS" ? "good" : gh.ci === "FAILURE" ? "bad" : "warn");
     fact("url", ghUrl(gh.name, o.login), "plain", ghUrl(gh.name, o.login));
     if (gh.homepage) fact("homepage", gh.homepage, "plain", gh.homepage);
@@ -359,6 +374,16 @@ export function showView(
       rows: commits.map((k) => ({
         cells: [c(relTime(Date.parse(k.date), o.now), "dim"), c(k.message)],
       })),
+    });
+  }
+
+  if (extra.readmeHtml) {
+    sections.push({ title: "readme", kind: "markdown", html: extra.readmeHtml, rows: [] });
+  } else if (extra.readmeHtml === null) {
+    sections.push({
+      title: "readme",
+      kind: "lines",
+      rows: [{ cells: [c("no README in this repo", "dim")] }],
     });
   }
 

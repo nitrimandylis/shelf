@@ -78,6 +78,12 @@ state or language or activity, every column header sorts, and the activity colum
 is a real chart whose bars tell you the week and the commit count when you point at
 them. `/` focuses the filter, `j`/`k` move, `enter` opens the repo, `esc` clears.
 
+Click a row and a card slides in from the right: facts, language makeup, latest
+release, the activity chart, recent commits, and the README rendered in place —
+ASCII-art banners intact, because fenced code is reproduced verbatim and images
+become their alt text rather than loading. The table stays put, so `j`/`k` walks
+the list with the card following along. `o` opens GitHub, `esc` closes.
+
 Refresh swaps the data in place over `/api/data` with a progress bar rather than
 reloading, because a cold GitHub fetch takes ten seconds and a page that freezes for
 ten seconds looks broken.

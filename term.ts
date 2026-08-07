@@ -148,7 +148,15 @@ export function renderView(view: View, opts: { width?: number; color?: boolean }
       out.push(on ? BOLD + t + RESET : t);
     }
     if (section.note) out.push(paint(truncate(section.note, max), "dim", on));
-    out.push(...(section.columns ? renderTable(section, max, on) : renderLines(section, max, on)));
+
+    if (section.kind === "markdown") {
+      // The terminal cannot draw rendered HTML, and dumping the raw README
+      // would bury the rest of the view. Say where it lives instead.
+      const kb = Math.max(1, Math.round((section.html?.length ?? 0) / 1024));
+      out.push(paint(`${kb}KB · read it with --html`, "dim", on));
+    } else {
+      out.push(...(section.columns ? renderTable(section, max, on) : renderLines(section, max, on)));
+    }
     out.push("");
   }
 

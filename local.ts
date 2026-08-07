@@ -154,6 +154,15 @@ export async function recentCommits(
     });
 }
 
+/** README straight off disk, for repos that have no GitHub side. */
+export async function localReadme(path: string): Promise<string | null> {
+  for (const name of ["README.md", "readme.md", "README"]) {
+    const f = Bun.file(join(path, name));
+    if (await f.exists()) return await f.text();
+  }
+  return null;
+}
+
 export async function scanLocal(cfg: Config): Promise<LocalRepo[]> {
   if (!Bun.which("git")) return [];
   const now = Date.now();

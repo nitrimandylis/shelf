@@ -237,12 +237,31 @@ export async function loadRepos(
 
 export type CommitLine = { date: string; message: string };
 
-/** One bounded live call for `show`: recent commits on the default branch. */
-export async function fetchRecentCommits(repo: string, limit = 8): Promise<CommitLine[]> {
+export type RepoDetail = {
+  commits: CommitLine[];
+  readme: string | null;
+  languages: { name: string; pct: number }[];
+  latestRelease: { tag: string; publishedAt: string } | null;
+};
+
+/**
+ * One bounded live call behind a repo card: commits, README body, language
+ * split and latest release. Measured ~0.75s. README is capped by GitHub's own
+ * blob truncation, which `isTruncated` reports.
+ */
+export async function fetchRepoDetail(repo: string, limit = 10): Promise<RepoDetail> {
   const token = githubToken();
   const query = `query($name: String!, $limit: Int!) {
   viewer {
     repository(name: $name) {
+      md: object(expression: "HEAD:README.md") { ... on Blob { text isTruncated } }
+      lower: object(expression: "HEAD:readme.md") { ... on Blob { text isTruncated } }
+      plain: object(expression: "HEAD:README") { ... on Blob { text isTruncated } }
+      languages(first: 8, orderBy: {field: SIZE, direction: DESC}) {
+        totalSize
+        edges { size node { name } }
+      }
+      latestRelease { tagName publishedAt }
       defaultBranchRef { target { ... on Commit {
         history(first: $limit) { nodes { committedDate messageHeadline } }
       } } }
@@ -250,8 +269,33 @@ export async function fetchRecentCommits(repo: string, limit = 8): Promise<Commi
   }
 }`;
   const data = await gql(token, query, { name: repo, limit });
-  const nodes = data.viewer?.repository?.defaultBranchRef?.target?.history?.nodes ?? [];
-  return nodes.map((n: GqlNode) => ({ date: n.committedDate, message: n.messageHeadline }));
+  const r = data.viewer?.repository;
+  if (!r) throw new Error(`no repository named ${repo}`);
+
+  const blob = r.md ?? r.lower ?? r.plain ?? null;
+  const total = r.languages?.totalSize ?? 0;
+
+  return {
+    commits: (r.defaultBranchRef?.target?.history?.nodes ?? []).map((n: GqlNode) => ({
+      date: n.committedDate,
+      message: n.messageHeadline,
+    })),
+    readme: blob?.text ?? null,
+    languages: total
+      ? (r.languages.edges ?? []).map((e: GqlNode) => ({
+          name: e.node.name,
+          pct: Math.round((e.size / total) * 100),
+        }))
+      : [],
+    latestRelease: r.latestRelease
+      ? { tag: r.latestRelease.tagName, publishedAt: r.latestRelease.publishedAt }
+      : null,
+  };
+}
+
+/** Kept for the commits-only path. */
+export async function fetchRecentCommits(repo: string, limit = 8): Promise<CommitLine[]> {
+  return (await fetchRepoDetail(repo, limit)).commits;
 }
 
 export type LinkResult = {

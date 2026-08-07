@@ -199,6 +199,61 @@ section.clean .legend { display: none; }
 section.clean .tick { color: var(--green); margin-left: 1ch; }
 section.clean .note { display: none; }
 
+/* ------------------------------------------------------------- drawer */
+/* A panel, not a modal: the table stays visible and keeps its selection, so
+   j/k walks the list with the card following along. */
+.drawer {
+  position: fixed; top: 0; right: 0; bottom: 0;
+  width: min(78ch, 52vw);
+  background: var(--bg);
+  border-left: 1px solid var(--line);
+  overflow-y: auto; overscroll-behavior: contain;
+  z-index: calc(var(--z-sticky) + 10);
+  padding: 2ch;
+  transform: translateX(0);
+  transition: transform 0.18s var(--ease);
+}
+.drawer[hidden] { display: block; transform: translateX(101%); visibility: hidden; }
+.drawer .frame { padding: 2ch; min-height: 100%; }
+/* keep the title clear of the close button */
+.drawer section:first-child h2 { padding-right: 9ch; }
+.drawer-close { position: absolute; top: 1ch; right: 1ch; z-index: 1; border-color: transparent; color: var(--dim); }
+.drawer-close:hover { color: var(--ink); }
+.drawer section { margin: 0 0 2.5ch; }
+.drawer section .frame { padding: 0; border: 0; }
+.drawer h2 { position: static; transform: none; background: none; padding: 0 0 0.5ch; color: var(--dim); font-weight: 400; letter-spacing: 0.08em; border-bottom: 1px solid var(--line); }
+.drawer .legend { position: static; transform: none; background: none; padding: 0 0 0.5ch; }
+.drawer .loading { color: var(--dim); padding: 2ch 0; }
+body.drawer-open { overflow: hidden; }
+
+/* readme */
+.md { overflow-wrap: break-word; }
+.md h1, .md h2, .md h3, .md h4, .md h5, .md h6 {
+  font-size: var(--fs); font-weight: 700; letter-spacing: 0.04em;
+  margin: 2.5ch 0 0.5ch; padding: 0; border: 0; color: var(--ink);
+  position: static; transform: none; background: none;
+}
+.md h1 { border-bottom: 1px solid var(--line); padding-bottom: 0.5ch; }
+.md p { margin: 0 0 1.5ch; }
+.md ul, .md ol { margin: 0 0 1.5ch; padding-left: 3ch; }
+.md li { margin: 0; }
+.md pre {
+  margin: 0 0 1.5ch; padding: 1ch 1.5ch; overflow-x: auto;
+  background: var(--surface); border: 1px solid var(--line);
+  line-height: 1.35;
+}
+.md pre code { background: none; border: 0; padding: 0; }
+.md code { background: var(--surface); border: 1px solid var(--line); padding: 0 0.5ch; }
+.md blockquote { margin: 0 0 1.5ch; padding-left: 2ch; border-left: 1px solid var(--line); color: var(--dim); }
+.md hr { border: 0; border-top: 1px solid var(--line); margin: 2ch 0; }
+.md table { margin: 0 0 1.5ch; width: 100%; table-layout: auto; }
+.md th, .md td { padding: 0.3ch 2ch 0.3ch 0; border-bottom: 1px solid var(--line); white-space: normal; vertical-align: top; }
+.md th { color: var(--dim); font-weight: 400; text-align: left; }
+.md img { max-width: 100%; }
+.md a { color: var(--cyan); border-bottom-color: var(--line); }
+
+@media (max-width: 900px) { .drawer { width: 100vw; } }
+
 .empty { color: var(--dim); padding: 4ch 0; text-align: center; }
 .empty strong { color: var(--ink); display: block; font-weight: 700; }
 footer { color: var(--dim); margin-top: 3ch; }
@@ -376,6 +431,14 @@ const JS = `
     row.cells.forEach(function (c, i) { tr.appendChild(cellNode(c, section.columns[i])); });
     var link = row.cells.filter(function (c) { return c.href; })[0];
     if (link) tr.setAttribute('data-href', link.href);
+    tr.setAttribute('data-name', row.cells[0] ? row.cells[0].text : '');
+    if (CARDS) {
+      tr.style.cursor = 'pointer';
+      tr.addEventListener('click', function (e) {
+        if (e.target.closest('a')) return; // let a real link win
+        openCard(tr.getAttribute('data-name'));
+      });
+    }
     return tr;
   }
 
@@ -423,6 +486,11 @@ const JS = `
         ul.appendChild(li);
       });
       frame.appendChild(ul);
+    } else if (kind === 'markdown') {
+      var md = el('div', 'md');
+      // Server-rendered from fully escaped input; see markdown.ts.
+      md.innerHTML = section.html || '';
+      frame.appendChild(md);
     } else if (kind === 'lines') {
       section.rows.forEach(function (r) {
         frame.appendChild(el('p', 'line ' + toneClass(r.cells[0].tone), r.cells.map(function (c) { return c.text; }).join(' ')));
@@ -492,6 +560,48 @@ const JS = `
     r.scrollIntoView({ block: 'nearest' });
   }
 
+  // ------------------------------------------------------------ card drawer
+  var drawer = document.getElementById('drawer');
+  var drawerBody = document.getElementById('drawer-body');
+  var CARDS = document.body.getAttribute('data-cards') === '1';
+  var cardToken = 0;
+  var openName = null;
+
+  function closeCard() {
+    openName = null;
+    drawer.hidden = true;
+    document.body.classList.remove('drawer-open');
+  }
+
+  function openCard(name) {
+    if (!CARDS || !name) return;
+    openName = name;
+    drawer.hidden = false;
+    document.body.classList.add('drawer-open');
+    drawerBody.textContent = '';
+    drawerBody.appendChild(el('p', 'loading', 'loading ' + name + '\u2026'));
+
+    var token = ++cardToken;
+    fetch('/api/repo?name=' + encodeURIComponent(name), { headers: { accept: 'application/json' } })
+      .then(function (r) { return r.json().then(function (b) { if (!r.ok) throw new Error(b.error || ('HTTP ' + r.status)); return b; }); })
+      .then(function (detail) {
+        // A slower earlier request must never overwrite a newer card.
+        if (token !== cardToken) return;
+        drawerBody.textContent = '';
+        detail.sections.forEach(function (sec) {
+          drawerBody.appendChild(renderSection(sec).node);
+        });
+        drawer.scrollTop = 0;
+      })
+      .catch(function (err) {
+        if (token !== cardToken) return;
+        drawerBody.textContent = '';
+        drawerBody.appendChild(el('p', 'loading t-warn', 'could not load ' + name + ': ' + err.message));
+      });
+  }
+
+  document.getElementById('drawer-close').addEventListener('click', closeCard);
+
   // ------------------------------------------------------------ controls
   var filter = document.getElementById('filter');
   filter.addEventListener('input', function () { state.q = filter.value.toLowerCase().trim(); render(); });
@@ -533,20 +643,32 @@ const JS = `
     });
   }
 
+  function selectedRow() { return visibleRows()[state.sel]; }
+
   document.addEventListener('keydown', function (e) {
     var typing = document.activeElement && /^(INPUT|SELECT|TEXTAREA)$/.test(document.activeElement.tagName);
     if (e.key === '/' && !typing) { e.preventDefault(); filter.focus(); filter.select(); return; }
     if (e.key === 'Escape') {
+      if (!drawer.hidden) { closeCard(); return; }
       if (typing) { filter.value = ''; state.q = ''; filter.blur(); render(); }
       return;
     }
     if (typing) return;
-    if (e.key === 'j' || e.key === 'ArrowDown') { e.preventDefault(); moveSel(1); }
-    else if (e.key === 'k' || e.key === 'ArrowUp') { e.preventDefault(); moveSel(-1); }
-    else if (e.key === 'Enter') {
-      var rows = visibleRows();
-      var r = rows[state.sel];
-      if (r && r.getAttribute('data-href')) window.open(r.getAttribute('data-href'), '_blank', 'noreferrer');
+    if (e.key === 'j' || e.key === 'ArrowDown') {
+      e.preventDefault(); moveSel(1);
+      // the card follows the selection, so j/k walks the list reading each one
+      if (!drawer.hidden) { var r1 = selectedRow(); if (r1) openCard(r1.getAttribute('data-name')); }
+    } else if (e.key === 'k' || e.key === 'ArrowUp') {
+      e.preventDefault(); moveSel(-1);
+      if (!drawer.hidden) { var r2 = selectedRow(); if (r2) openCard(r2.getAttribute('data-name')); }
+    } else if (e.key === 'Enter') {
+      var r = selectedRow();
+      if (!r) return;
+      if (CARDS) openCard(r.getAttribute('data-name'));
+      else if (r.getAttribute('data-href')) window.open(r.getAttribute('data-href'), '_blank', 'noreferrer');
+    } else if (e.key === 'o') {
+      var ro = selectedRow();
+      if (ro && ro.getAttribute('data-href')) window.open(ro.getAttribute('data-href'), '_blank', 'noreferrer');
     }
   });
 
@@ -599,7 +721,7 @@ export function renderHtml(
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Ctext y='13' font-size='13'%3E%F0%9F%97%84%3C/text%3E%3C/svg%3E">
 <style>${CSS}</style>
 </head>
-<body>
+<body data-cards="${opts.refreshable ? "1" : "0"}">
 <div class="wrap">
 <header>
   <div class="frame">
@@ -618,8 +740,14 @@ export function renderHtml(
 </header>
 ${facetsHtml(view)}
 <main id="views"></main>
+<aside class="drawer" id="drawer" hidden aria-label="Repo detail">
+  <div class="frame">
+    <button class="btn drawer-close" id="drawer-close" type="button" aria-label="Close">[ esc ]</button>
+    <div id="drawer-body"></div>
+  </div>
+</aside>
 <footer>
-  <kbd>/</kbd> filter · <kbd>j</kbd><kbd>k</kbd> move · <kbd>enter</kbd> open · <kbd>esc</kbd> clear · click a column to sort
+  <kbd>/</kbd> filter · <kbd>j</kbd><kbd>k</kbd> move · <kbd>enter</kbd> card · <kbd>o</kbd> github · <kbd>esc</kbd> close · click a column to sort
 </footer>
 </div>
 <script type="application/json" id="shelf-data">${jsonScript(view)}</script>
@@ -637,7 +765,7 @@ ${facetsHtml(view)}
  */
 export async function serveView(
   build: (force: boolean) => Promise<View>,
-  opts: { open?: boolean } = {},
+  opts: { open?: boolean; repo?: (name: string) => Promise<View> } = {},
 ): Promise<never> {
   const server = Bun.serve({
     port: 0,
@@ -650,6 +778,12 @@ export async function serveView(
         if (url.pathname === "/api/data") {
           return Response.json(await build(force));
         }
+        if (url.pathname === "/api/repo") {
+          const name = url.searchParams.get("name");
+          if (!name) return Response.json({ error: "name is required" }, { status: 400 });
+          if (!opts.repo) return Response.json({ error: "cards are not available" }, { status: 404 });
+          return Response.json(await opts.repo(name));
+        }
         if (url.pathname === "/") {
           return new Response(renderHtml(await build(force), { refreshable: true }), {
             headers: { "content-type": "text/html; charset=utf-8" },
@@ -658,7 +792,7 @@ export async function serveView(
         return new Response("not found", { status: 404 });
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
-        if (url.pathname === "/api/data") {
+        if (url.pathname.startsWith("/api/")) {
           return Response.json({ error: msg }, { status: 500 });
         }
         return new Response(`<pre>${esc(msg)}</pre>`, {

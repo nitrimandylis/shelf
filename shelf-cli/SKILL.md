@@ -53,6 +53,11 @@ timeout. If the user wants the browser view, hand them the command to type.
 `-o FILE` is the non-blocking alternative: it writes the same page to a file
 and exits.
 
+Cards (the per-repo side panel with the README) exist only in the served page,
+because they are fetched from `/api/repo?name=<repo>`. A written `-o` file has
+no server, so its rows open GitHub instead. To get the same data headlessly use
+`shelf show <repo> --json`.
+
 **Never scrape the HTML.** The page renders client-side from a JSON model
 embedded in a `<script type="application/json">`, so the markup contains no
 rows and a text extractor gets nothing. Use `--json`, which is the same data
@@ -117,6 +122,11 @@ shelf audit --json | jq '.unpublished'
 - **`state: "local"` with `external: true`** is a clone of someone else's repo.
   It is not unpublished work and the audit does not report it as such.
 - **Repos are excluded via config, not a flag.** There is no `--exclude`.
+- **`show --json` does not return the README body**, only `hasReadmeBody`. The
+  rendered HTML is served to the card; if you need the text, read it from the
+  repo or the GitHub API directly.
+- **A card costs one live GitHub call** (~0.75s) for README, languages, release
+  and commits. It is fetched when the card opens, never up front for 46 repos.
 
 ## What it cannot do
 
