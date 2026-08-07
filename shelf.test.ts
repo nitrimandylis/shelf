@@ -1,5 +1,5 @@
 import { test, expect, describe } from "bun:test";
-import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from "node:fs";
+import { mkdtempSync, mkdirSync, writeFileSync, rmSync, symlinkSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -19,8 +19,8 @@ import {
   type Repo,
   type LocalRepo,
 } from "./model.ts";
-import { parseStatus, parseRemote, findRepos } from "./local.ts";
-import { DEFAULT_SCAN_PATHS, DEFAULTS, shortenHome, expandTilde } from "./config.ts";
+import { parseStatus, parseRemote, findRepos, realPath, scanRoots } from "./local.ts";
+import { DEFAULT_SCAN_PATHS, DEFAULTS, shortenHome, expandTilde, normalizeScanPath } from "./config.ts";
 import { parseArgs } from "./shelf.ts";
 import { triageView, auditView, indexView, showView } from "./views.ts";
 import { renderView } from "./term.ts";
@@ -1003,5 +1003,59 @@ describe("usable by strangers", () => {
     expect(shortenHome(expanded)).toBe("~/.config/shelf/config.json");
     // a path outside home is left alone
     expect(shortenHome("/etc/hosts")).toBe("/etc/hosts");
+  });
+});
+
+
+// ---------------------------------------------------------------- scan roots
+
+describe("scan roots", () => {
+  test("normalizeScanPath accepts tilde, relative and absolute", () => {
+    expect(normalizeScanPath("~/code")).toBe("~/code");
+    expect(normalizeScanPath("  ~/code  ")).toBe("~/code");
+    // an absolute path under home comes back tilde-relative, so the config
+    // stays portable between machines
+    expect(normalizeScanPath(expandTilde("~/code"))).toBe("~/code");
+    expect(normalizeScanPath("/etc")).toBe("/etc");
+  });
+
+  test("the same directory spelled two ways resolves to one identity", () => {
+    const root = mkdtempSync(join(tmpdir(), "shelf-scan-"));
+    try {
+      mkdirSync(join(root, "real", "repo", ".git"), { recursive: true });
+      symlinkSync(join(root, "real"), join(root, "link"));
+      // a symlinked root and the real one are the same place
+      expect(realPath(join(root, "link"))).toBe(realPath(join(root, "real")));
+      // and scanning both together must not list the repo twice
+      const found = findRepos([join(root, "real"), join(root, "link")], 2);
+      expect(found).toHaveLength(1);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  test("scanRoots reports existence and repo count per root", () => {
+    const root = mkdtempSync(join(tmpdir(), "shelf-scan-"));
+    try {
+      mkdirSync(join(root, "has", "a", ".git"), { recursive: true });
+      mkdirSync(join(root, "has", "b", ".git"), { recursive: true });
+      mkdirSync(join(root, "empty"), { recursive: true });
+      const out = scanRoots([join(root, "has"), join(root, "empty"), join(root, "gone")], 2);
+      expect(out.map((r) => [r.exists, r.repos])).toEqual([[true, 2], [true, 0], [false, 0]]);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  test("--add and --remove parse as options with a value", () => {
+    expect(parseArgs(["scan", "--add", "~/code"]).flags.add).toBe("~/code");
+    expect(parseArgs(["scan", "--remove", "~/code"]).flags.remove).toBe("~/code");
+    expect(parseArgs(["scan"]).flags.add).toBeNull();
+    expect(() => parseArgs(["scan", "--add"])).toThrow(/needs a path/);
+  });
+
+  test("realPath degrades to the expanded path when it cannot resolve", () => {
+    const missing = "/definitely/not/here/at/all";
+    expect(realPath(missing)).toBe(missing);
   });
 });

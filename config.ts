@@ -1,6 +1,7 @@
 import { homedir } from "node:os";
 import { join } from "node:path";
 import { mkdirSync } from "node:fs";
+import { resolve } from "node:path";
 
 export type Config = {
   scanPaths: string[];
@@ -55,6 +56,39 @@ export const configDir = () => join(homedir(), ".config", "shelf");
 export const configPath = () => join(configDir(), "config.json");
 export const cacheDir = () => join(homedir(), ".cache", "shelf");
 export const cachePath = () => join(cacheDir(), "repos.json");
+
+/**
+ * Normalise a path a user typed: accepts `~/x`, `./x`, `x` and absolute paths,
+ * and stores it tilde-relative when it is under home so the config stays
+ * portable between machines and users.
+ */
+export function normalizeScanPath(input: string): string {
+  return shortenHome(resolve(expandTilde(input.trim())));
+}
+
+/**
+ * Rewrite the config file, preserving any keys shelf does not know about.
+ * Reads the raw file rather than the merged object so a hand-added key is not
+ * silently dropped the first time the user runs a command that writes.
+ */
+export async function updateConfig(mutate: (raw: Record<string, unknown>) => void): Promise<void> {
+  const path = configPath();
+  let raw: Record<string, unknown> = {};
+  const file = Bun.file(path);
+  if (await file.exists()) {
+    try {
+      const parsed = await file.json();
+      if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) raw = parsed;
+    } catch {
+      throw new Error(`config is not valid JSON: ${shortenHome(path)}\n  fix it, or delete it to get the defaults back`);
+    }
+  } else {
+    raw = { ...DEFAULTS };
+  }
+  mutate(raw);
+  mkdirSync(configDir(), { recursive: true });
+  await Bun.write(path, JSON.stringify(raw, null, 2) + "\n");
+}
 
 /** Reads config, writing the default file on first run so it is discoverable. */
 export async function loadConfig(): Promise<Config & { created?: boolean }> {

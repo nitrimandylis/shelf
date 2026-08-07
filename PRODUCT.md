@@ -123,8 +123,13 @@ must not assume *this* machine:
   with missing ones skipped. `~/cc` was the original default and is a fact about
   one machine, not a sensible guess for anyone else; it now lives in that user's
   own config file.
-- **Finding no local repos says why.** It is the most likely first-run
-  confusion, and half the point of the tool lives on that side.
+- **Finding no local repos says why, and names a command.** It is the most
+  likely first-run confusion, and half the point of the tool lives on that side.
+  `shelf scan` shows every root and what it holds; `shelf scan --add PATH`
+  fixes it. Telling someone to hand-edit JSON is not an answer.
+- **Scan roots are compared by resolved path.** `.`, `~/Sites` and an absolute
+  path can name the same directory, and a symlinked or differently-spelled root
+  listed twice made every repo under it appear twice.
 - **The first run prints where the config went**, with `~` rather than an
   absolute path.
 - **Transient GitHub failures are retried** (two retries, 5xx and network only).

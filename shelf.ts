@@ -1,7 +1,7 @@
 #!/usr/bin/env bun
-import { loadConfig, configPath, shortenHome, type Config } from "./config.ts";
+import { loadConfig, configPath, shortenHome, normalizeScanPath, updateConfig, type Config } from "./config.ts";
 import { loadRepos, fetchRepoDetail, checkLinks, type CommitLine } from "./github.ts";
-import { scanLocal, recentCommits, localReadme } from "./local.ts";
+import { scanLocal, recentCommits, localReadme, scanRoots, realPath } from "./local.ts";
 import { mergeEntries, auditOffline, relTime, type Entry, type AuditReport } from "./model.ts";
 import { triageView, auditView, showView, indexView, type View, type ShowExtras } from "./views.ts";
 import { renderView } from "./term.ts";
@@ -17,6 +17,9 @@ usage
   shelf audit [options]        hygiene plus the checks that actually fire
   shelf show <repo>            one repo on one screen
   shelf index [options]        uncurated list of every public repo
+  shelf scan                   where it looks for local repos
+  shelf scan --add PATH        add a scan root
+  shelf scan --remove PATH     drop one
 
 options
   --all           include cold repos in triage instead of collapsing them
@@ -46,10 +49,15 @@ type Flags = {
   open: boolean;
   links: boolean;
   out: string | null;
+  add: string | null;
+  remove: string | null;
 };
 
 export function parseArgs(argv: string[]): { cmd: string; args: string[]; flags: Flags } {
-  const flags: Flags = { json: false, html: false, all: false, refresh: false, open: true, links: true, out: null };
+  const flags: Flags = {
+    json: false, html: false, all: false, refresh: false, open: true, links: true,
+    out: null, add: null, remove: null,
+  };
   const rest: string[] = [];
 
   for (let i = 0; i < argv.length; i++) {
@@ -64,6 +72,11 @@ export function parseArgs(argv: string[]): { cmd: string; args: string[]; flags:
       const v = argv[++i];
       if (!v) throw new Error(`${a} needs a file path`);
       flags.out = v;
+    } else if (a === "--add" || a === "--remove") {
+      const v = argv[++i];
+      if (!v) throw new Error(`${a} needs a path\n  shelf scan ${a} ~/some/dir`);
+      if (a === "--add") flags.add = v;
+      else flags.remove = v;
     } else if (a.startsWith("-") && a !== "-") {
       throw new Error(`unknown option: ${a}`);
     } else rest.push(a);
@@ -106,7 +119,7 @@ async function gather(cfg: Config, force: boolean, now = Date.now()): Promise<Ga
     // Half the point of the tool is the local side. Finding nothing usually
     // means the scan roots are wrong, not that there is nothing to find.
     warnings.push(
-      `no local repos found — set scanPaths in ${shortenHome(configPath())}`,
+      "no local repos found — run: shelf scan   to see where it looked",
     );
   }
 
@@ -396,6 +409,82 @@ async function buildRepoView(cfg: Config, name: string): Promise<View> {
   );
 }
 
+/**
+ * Where shelf looks for local repos, and the only place that changes it.
+ * Hand-editing JSON is a poor answer to "it found nothing", which is the most
+ * likely first-run confusion.
+ */
+async function cmdScan(cfg: Config, flags: Flags): Promise<void> {
+  const target = flags.add ?? flags.remove;
+
+  if (target) {
+    if (flags.add && flags.remove) {
+      console.error("--add and --remove cannot be combined");
+      process.exitCode = 1;
+      return;
+    }
+    const action = flags.add ? "--add" : "--remove";
+    const path = normalizeScanPath(target);
+    // Compare resolved paths, not the strings: `.`, `~/Sites` and an absolute
+    // path can all name the same directory.
+    const resolved = realPath(path);
+    const existing = cfg.scanPaths.find((p) => realPath(p) === resolved);
+    const has = existing !== undefined;
+
+    if (action === "--add" && has) {
+      console.error(
+        existing === path
+          ? `${path} is already a scan root`
+          : `${path} is already a scan root, listed as ${existing}`,
+      );
+      process.exitCode = 1;
+      return;
+    }
+    if (action === "--remove" && !has) {
+      console.error(`${path} is not a scan root\n  shelf scan   to list them`);
+      process.exitCode = 1;
+      return;
+    }
+
+    await updateConfig((raw) => {
+      const current = Array.isArray(raw.scanPaths) ? (raw.scanPaths as string[]) : cfg.scanPaths;
+      raw.scanPaths =
+        action === "--add" ? [...current, path] : current.filter((p) => realPath(p) !== resolved);
+    });
+
+    if (action === "--remove") {
+      console.log(`removed ${path}`);
+      return;
+    }
+    const found = scanRoots([path], cfg.scanDepth)[0]!;
+    console.log(
+      found.exists
+        ? `added ${path} — ${found.repos} ${found.repos === 1 ? "repo" : "repos"} found`
+        : `added ${path} — not found on this machine yet`,
+    );
+    return;
+  }
+
+  const roots = scanRoots(cfg.scanPaths, cfg.scanDepth);
+  if (flags.json) {
+    emit({ configPath: shortenHome(configPath()), scanDepth: cfg.scanDepth, roots });
+    return;
+  }
+
+  const live = roots.filter((r) => r.exists).length;
+  const total = roots.reduce((a, r) => a + r.repos, 0);
+  const width = Math.max(...roots.map((r) => r.path.length), 4);
+
+  console.log(`scan roots · ${live} of ${roots.length} exist · ${total} repos · ${shortenHome(configPath())}`);
+  for (const r of roots) {
+    const mark = r.exists ? "✓" : "·";
+    const note = r.exists ? `${r.repos} ${r.repos === 1 ? "repo" : "repos"}` : "not found";
+    console.log(`  ${mark} ${r.path.padEnd(width)}  ${note}`);
+  }
+  console.log(`\n  shelf scan --add ~/somewhere    to add a root`);
+  console.log(`  shelf scan --remove ~/somewhere to drop one`);
+}
+
 async function cmdIndex(cfg: Config, flags: Flags): Promise<void> {
   const build = async (force: boolean) => {
     const g = await gather(cfg, force);
@@ -450,6 +539,8 @@ async function main(): Promise<void> {
       return cmdShow(cfg, flags, args[0]);
     case "index":
       return cmdIndex(cfg, flags);
+    case "scan":
+      return cmdScan(cfg, flags);
     default:
       console.error(`unknown command: ${cmd}\n  try: shelf --help`);
       process.exitCode = 1;

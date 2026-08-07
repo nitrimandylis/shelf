@@ -1,4 +1,4 @@
-import { readdirSync, existsSync } from "node:fs";
+import { readdirSync, existsSync, realpathSync } from "node:fs";
 import { join, basename } from "node:path";
 import { expandTilde, type Config } from "./config.ts";
 import { weekBuckets, WEEKS, type LocalRepo } from "./model.ts";
@@ -60,6 +60,15 @@ export function parseRemote(url: string): { owner: string; name: string } | null
 
 const SKIP = new Set(["node_modules", "Library", "Applications", "vendor", "target", "dist"]);
 
+/** Resolved path for identity comparisons; falls back when it cannot resolve. */
+export function realPath(p: string): string {
+  try {
+    return realpathSync(expandTilde(p));
+  } catch {
+    return expandTilde(p);
+  }
+}
+
 /**
  * Find git repos under the configured roots. Descends INTO repos as well,
  * because a repo checked out inside another repo is common enough (vendored
@@ -71,8 +80,12 @@ export function findRepos(roots: string[], maxDepth: number): string[] {
   const seen = new Set<string>();
 
   const walk = (dir: string, depth: number) => {
-    if (existsSync(join(dir, ".git")) && !seen.has(dir)) {
-      seen.add(dir);
+    // Dedupe on the resolved path: two scan roots can spell the same directory
+    // differently (a symlink, a relative path, macOS /var vs /private/var) and
+    // string comparison would list every repo under it twice.
+    const key = realPath(dir);
+    if (existsSync(join(dir, ".git")) && !seen.has(key)) {
+      seen.add(key);
       found.push(dir);
     }
     if (depth >= maxDepth) return;
@@ -162,6 +175,17 @@ export async function localReadme(path: string): Promise<string | null> {
     if (await f.exists()) return await f.text();
   }
   return null;
+}
+
+export type ScanRoot = { path: string; exists: boolean; repos: number };
+
+/** What each configured root contributes, for `shelf scan`. */
+export function scanRoots(paths: string[], maxDepth: number): ScanRoot[] {
+  return paths.map((p) => ({
+    path: p,
+    exists: existsSync(expandTilde(p)),
+    repos: findRepos([p], maxDepth).length,
+  }));
 }
 
 export async function scanLocal(cfg: Config): Promise<LocalRepo[]> {

@@ -47,6 +47,18 @@ miss suggests candidates.
 .B index
 Every public, non-fork repo grouped by language. This is the uncurated long
 tail, meant to be written to a file with \fB\-o\fR and published.
+.TP
+.B scan [\fB\-\-add\fR \fIPATH\fR | \fB\-\-remove\fR \fIPATH\fR]
+Where shelf looks for local repos. With no option it lists every configured
+root, whether it exists, and how many repos it holds. \fB\-\-add\fR and
+\fB\-\-remove\fR edit the config so that hand-editing JSON is never required.
+.IP
+Paths may be given as \fI~/x\fR, a relative path or an absolute one, and are
+stored tilde-relative when under home so the config stays portable. Adding a
+directory already covered by another root is refused, comparing resolved paths
+so a symlink or a different spelling of the same place is recognised. Adding a
+path that does not exist yet is allowed and says so \- useful for a drive that
+is not always mounted.
 .SH OPTIONS
 .TP
 .B \-\-all
@@ -143,7 +155,8 @@ Keys: \fBscanPaths\fR (roots to scan, tilde allowed; defaults to the common
 ones \- \fI~/code\fR, \fI~/src\fR, \fI~/dev\fR, \fI~/Developer\fR,
 \fI~/projects\fR, \fI~/repos\fR, \fI~/git\fR, \fI~/work\fR and
 \fI~/workspace\fR \- with missing ones skipped, so set this if your code lives
-elsewhere), \fBscanDepth\fR (how deep to walk, default 2), \fBactiveDays\fR
+elsewhere, or use \fBshelf scan \-\-add\fR), \fBscanDepth\fR (how deep to
+walk, default 2), \fBactiveDays\fR
 (the warm/cold threshold, default 90), \fBcacheTtlMinutes\fR (default 60),
 \fBheavyMb\fR (default 20), \fBexclude\fR (repo names to drop entirely).
 .TP
@@ -181,6 +194,9 @@ One repo object in the shape above, plus \fBrecentCommits\fR.
 .TP
 .B shelf index \-\-json
 \fB{login, repos: []}\fR, public non-forks only.
+.TP
+.B shelf scan \-\-json
+\fB{configPath, scanDepth, roots: [{path, exists, repos}]}\fR.
 .SH EXIT STATUS
 0 on success. 1 on an unknown command or option, a missing or unknown repo
 name for \fBshow\fR, an unreadable config, or a GitHub failure with no cache to

@@ -45,6 +45,13 @@ TUI, no picker and no prompt anywhere in this tool.
 | `shelf audit` | Five checks: hygiene, stale, dead links, heavy, unpublished. |
 | `shelf show <repo>` | One repo in full, plus recent commits and CI. |
 | `shelf index` | Every public non-fork repo, grouped by language. |
+| `shelf scan` | Which roots are searched for local repos, and what each holds. |
+| `shelf scan --add PATH` | Add a scan root. `--remove PATH` drops one. |
+
+`shelf scan --add` / `--remove` are the only commands that write anything
+outside the cache, and they only touch `scanPaths` in the config. They are safe
+to run unattended, but **do not add roots speculatively** — ask the user where
+their code lives rather than guessing.
 
 **Always add `--json`** when you are consuming the output rather than showing
 it to the user. Human output is aligned and coloured and is not a parsing
@@ -126,6 +133,10 @@ shelf audit --json | jq '.unpublished'
 - **Local matching is by origin URL only, never by directory name.** A local
   folder named `nous` with no remote stays `local` even when a GitHub repo
   called `nous` exists, because it is genuinely not pushed there.
+- **"no local repos found" almost always means the scan roots are wrong**, not
+  that the user has no clones. `shelf scan` shows where it looked;
+  `shelf scan --add ~/their/dir` fixes it. Reach for that before concluding
+  anything about their machine.
 - **`state: "local"` with `external: true`** is a clone of someone else's repo.
   It is not unpublished work and the audit does not report it as such.
 - **Repos are excluded via config, not a flag.** There is no `--exclude`.

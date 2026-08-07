@@ -66,6 +66,7 @@ nick@shelf:~$ shelf
 | 02 | `shelf audit` | five checks. empty ones print a tick instead of hiding, so the output stays honest |
 | 03 | `shelf show <repo>` | one repo, one screen. everything cached, plus one live call for commits and ci |
 | 04 | `shelf index` | every public non-fork grouped by language — the uncurated long tail, meant for `-o` |
+| 05 | `shelf scan` | where it looks for local repos · `--add`/`--remove` a root without editing json |
 
 Every one of them takes `--json` for machines and `--html` for a browser.
 
