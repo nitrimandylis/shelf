@@ -106,12 +106,18 @@ Rows are exactly one `--lh`.
   The header's height changes without the window resizing — a warning appears,
   or the drawer opens and re-wraps its controls (57px → 85px). Observe the
   element, don't guess at the events that might have changed it.
-- Responsive is structural: columns drop by priority (`lang`/`iss` at 1280px,
-  `commits` at 1040, the chart at 600). **`note` never drops** — it carries
-  UNPUBLISHED, dirty and failing CI, the reason to open the page at all.
-  Breakpoints track `--fs`: at 15px the eight-column table needs ~1180px of
-  content width, so they sit above that rather than at the old 13px values.
-  Changing `--fs` means re-measuring them.
+- **The table sizes to its content (`width: auto`), never `100%`.** With `100%`
+  the last column absorbed every spare pixel: on a wide screen the mostly-empty
+  note column ran to 543px while the data crammed into the left half. A terminal
+  table is as wide as its widest row and no wider.
+- Responsive is structural: columns drop by container width (`lang`/`iss` at
+  880px, `commits` at 740, the chart at 560). **`note` never drops** — it
+  carries UNPUBLISHED, dirty and failing CI, the reason to open the page at all,
+  and it is the only column allowed to wrap.
+  **These thresholds are measured, not guessed**: content-sized, the full
+  eight-column table is 810px, so it needs ~870px of container once wrap and
+  frame padding are counted. Changing `--fs` or the column set means
+  re-measuring them.
 
 ## Components
 
@@ -138,7 +144,7 @@ Focus is a 1px cyan outline, never removed.
 the card drawer. No page-load choreography — the page loads into a task.
 
 **The drawer is a grid column, not an overlay.** Opening a card animates
-`grid-template-columns` from `1fr 0` to `1fr var(--drawer-w)` over 280ms on
+`grid-template-columns` from `1fr 0` to `1fr var(--drawer-w)` (`min(150ch, 54vw)`) over 280ms on
 `cubic-bezier(0.32, 0.72, 0, 1)`, the iOS drawer curve — the built-in easings
 are too weak to read as deliberate. The panel rides that with a short
 `translateX` and an opacity fade so it slides in rather than being unveiled.

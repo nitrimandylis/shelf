@@ -41,7 +41,7 @@ const CSS = `
   --ease: cubic-bezier(0.22, 1, 0.36, 1);
   /* iOS drawer curve: strong ease-out, no built-in easing is punchy enough */
   --ease-drawer: cubic-bezier(0.32, 0.72, 0, 1);
-  --drawer-w: min(92ch, 52vw);
+  --drawer-w: min(150ch, 54vw);
   --z-sticky: 100;
   color-scheme: dark;
 }
@@ -148,7 +148,10 @@ h2 { font-size: var(--fs); margin: 0; font-weight: 700; letter-spacing: 0.06em; 
 h2 .desc { font-weight: 400; letter-spacing: 0; color: var(--dim); }
 .note { color: var(--dim); margin: 0 0 1ch; }
 
-table { border-collapse: collapse; width: 100%; }
+/* width: auto, not 100%. With 100% the last column absorbed all slack — on a
+   wide screen the mostly-empty note column ran to 543px while the data crammed
+   left. Sizing to content is what a terminal table does. */
+table { border-collapse: collapse; width: auto; max-width: 100%; }
 thead th {
   position: sticky; top: var(--head-h, 6ch); z-index: 1; background: var(--bg);
   text-align: left; font-weight: 400; color: var(--dim);
@@ -163,7 +166,7 @@ td {
   border-bottom: 1px solid transparent;
 }
 th.right, td.right { text-align: right; padding-right: 2ch; }
-td:last-child, th:last-child { white-space: normal; width: 99%; padding-right: 0; }
+td:last-child, th:last-child { white-space: normal; max-width: 48ch; padding-right: 0; overflow-wrap: break-word; }
 tbody tr { transition: background 0.1s var(--ease); }
 tbody tr:hover { background: var(--surface); }
 tbody tr[aria-selected="true"] { background: var(--sel); }
@@ -273,7 +276,7 @@ section.clean .note { display: none; }
 .md code { background: var(--surface); border: 1px solid var(--line); padding: 0 0.5ch; }
 .md blockquote { margin: 0 0 1.5ch; padding-left: 2ch; border-left: 1px solid var(--line); color: var(--dim); }
 .md hr { border: 0; border-top: 1px solid var(--line); margin: 2ch 0; }
-.md table { margin: 0 0 1.5ch; width: 100%; table-layout: auto; }
+.md table { margin: 0 0 1.5ch; width: 100%; max-width: 100%; table-layout: auto; }
 .md th, .md td { padding: 0.3ch 2ch 0.3ch 0; border-bottom: 1px solid var(--line); white-space: normal; vertical-align: top; }
 .md th { color: var(--dim); font-weight: 400; text-align: left; }
 .md img { max-width: 100%; }
@@ -294,12 +297,14 @@ kbd { color: var(--ink); border: 1px solid var(--line); padding: 0 0.5ch; }
 /* ------------------------------------------------------------- responsive */
 /* Container queries, not viewport queries: opening the drawer narrows the table
    without changing the viewport, so @media would never fire and the columns
-   would squeeze instead of dropping. Thresholds track --fs — at 15px the
-   eight-column table needs ~1180px of content width. */
-@container main (max-width: 1280px) { [data-drop="3"] { display: none; } }
-@container main (max-width: 1040px) { [data-drop="2"] { display: none; } }
-@container main (max-width: 880px)  { .controls { margin-left: 0; width: 100%; } input[type=search] { flex: 1; min-width: 0; } }
-@container main (max-width: 600px) { [data-drop="1"] { display: none; } }
+   would squeeze instead of dropping.
+   Thresholds are measured, not guessed: with content-sized columns the full
+   eight-column table is 810px, so it needs ~870px of container once wrap and
+   frame padding are counted. Re-measure these if --fs changes. */
+@container main (max-width: 880px) { [data-drop="3"] { display: none; } }
+@container main (max-width: 740px) { [data-drop="2"] { display: none; } }
+@container main (max-width: 820px) { .controls { margin-left: 0; width: 100%; } input[type=search] { flex: 1; min-width: 0; } }
+@container main (max-width: 560px) { [data-drop="1"] { display: none; } }
 
 @media (max-width: 600px) {
   /* The whole grid derives from --fs, so stepping the type down shrinks
