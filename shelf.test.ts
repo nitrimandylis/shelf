@@ -21,9 +21,9 @@ import {
 } from "./model.ts";
 import { parseStatus, parseRemote, findRepos } from "./local.ts";
 import { parseArgs } from "./shelf.ts";
-import { triageView, auditView, indexView } from "./views.ts";
+import { triageView, auditView, indexView, showView } from "./views.ts";
 import { renderView } from "./term.ts";
-import { renderHtml } from "./html.ts";
+import { renderHtml, jsonScript } from "./html.ts";
 
 // ---------------------------------------------------------------- fixtures
 
@@ -522,9 +522,108 @@ describe("triageView", () => {
     expect(triageView(e, viewOpts).sections[0]!.rows[0]!.cells[4]!.text).toBe("9");
   });
 
+  test("facets count what the chips claim", () => {
+    const e = mergeEntries(
+      [repo({ name: "pub" }), repo({ name: "priv", visibility: "private" }), repo({ name: "old", pushedAt: ago(200) })],
+      [local({ name: "deck", remoteOwner: null, remoteName: null }), local({ name: "pub", remoteName: "pub", dirty: 2 })],
+      "nitrimandylis",
+    );
+    const facets = triageView(e, viewOpts).facets!;
+    const byLabel = Object.fromEntries(facets.map((f) => [f.label, f.count]));
+    expect(byLabel["unpublished"]).toBe(1);
+    expect(byLabel["uncommitted"]).toBe(1);
+    expect(byLabel["private"]).toBe(1);
+    expect(byLabel["cold"]).toBe(1);
+    expect(byLabel["on this machine"]).toBe(2);
+  });
+
+  test("a facet with a zero count is not offered as a chip", () => {
+    const e = mergeEntries([repo()], [], "n");
+    const labels = triageView(e, viewOpts).facets!.map((f) => f.label);
+    expect(labels).not.toContain("unpublished");
+    expect(labels).not.toContain("archived");
+  });
+
+  test("every row carries the facets the chips filter on", () => {
+    const e = mergeEntries([repo({ name: "x" })], [], "n");
+    const f = triageView(e, viewOpts).sections[0]!.rows[0]!.facets!;
+    expect(f.state).toBe("remote");
+    expect(f.temp).toBe("warm");
+    expect(f.unpublished).toBe("no");
+  });
+
+  test("the activity cell carries raw weeks for the SVG, not just glyphs", () => {
+    const weeks = [0, 1, 2, 3, 4, 5, 6, 7];
+    const e = mergeEntries([repo({ weeks, commits8w: 28 })], [], "n");
+    const cell = triageView(e, viewOpts).sections[0]!.rows[0]!.cells[3]!;
+    expect(cell.bars).toEqual(weeks);
+    expect(cell.text.length).toBe(8); // terminal still gets its glyphs
+  });
+
+  test("a repo with no activity data has no bars to draw", () => {
+    const e = mergeEntries([], [local({ remoteOwner: null, remoteName: null, weeks: [] })], "n");
+    expect(triageView(e, viewOpts).sections[0]!.rows[0]!.cells[3]!.bars).toBeUndefined();
+  });
+
+  test("the note column never drops: it carries the reason to look", () => {
+    const cols = triageView(mergeEntries([repo()], [], "n"), viewOpts).sections[0]!.columns!;
+    const note = cols.find((c) => c.label === "note")!;
+    const state = cols.find((c) => c.label === "state")!;
+    const repoCol = cols.find((c) => c.label === "repo")!;
+    // undefined drop == never hidden at any breakpoint
+    expect(note.drop).toBeUndefined();
+    expect(state.drop).toBeUndefined();
+    expect(repoCol.drop).toBeUndefined();
+    // and the low-value columns do drop, highest number first
+    expect(cols.find((c) => c.label === "lang")!.drop).toBe(3);
+    expect(cols.find((c) => c.label === "iss")!.drop).toBe(3);
+  });
+
+  test("group-by fields all exist as row facets", () => {
+    const e = mergeEntries([repo()], [], "n");
+    const view = triageView(e, viewOpts);
+    const facetKeys = Object.keys(view.sections[0]!.rows[0]!.facets!);
+    for (const g of view.groupBy!) expect(facetKeys).toContain(g.field);
+  });
+
   test("a failing CI run is surfaced as bad", () => {
     const e = mergeEntries([repo({ ci: "FAILURE" })], [], "n");
     expect(triageView(e, viewOpts).sections[0]!.rows[0]!.cells[7]!.tone).toBe("bad");
+  });
+});
+
+describe("section kinds", () => {
+  test("a clean audit check is flagged so the browser can collapse it", () => {
+    const view = auditView(
+      { hygiene: [], stale: [{ repo: "old", detail: "200d" }], heavy: [], unpublished: [], deadLinks: [], skippedPrivate: 3 },
+      { meta: "t", login: "n", activeDays: 90, heavyMb: 20 },
+    );
+    const clean = view.sections.filter((s) => s.clean);
+    expect(clean).toHaveLength(4);
+    expect(view.sections.find((s) => s.title?.startsWith("stale"))!.clean).toBeUndefined();
+  });
+
+  test("show uses facts and timeline kinds, not a reused table", () => {
+    const e = mergeEntries([repo({ name: "swatch", weeks: [1, 0, 0, 0, 0, 0, 0, 2] })], [], "n");
+    const view = showView(e[0]!, [{ date: ago(1), message: "do a thing" }], {
+      login: "n",
+      now: NOW,
+      meta: "t",
+    });
+    const kinds = view.sections.map((s) => s.kind);
+    expect(kinds).toContain("facts");
+    expect(kinds).toContain("timeline");
+    // the activity chart gets its own section with real bars
+    const act = view.sections.find((s) => s.title === "activity")!;
+    expect(act.rows[0]!.cells[0]!.bars).toEqual([1, 0, 0, 0, 0, 0, 0, 2]);
+  });
+
+  test("a commit-fetch failure degrades to a line, not a broken timeline", () => {
+    const e = mergeEntries([repo()], [], "n");
+    const view = showView(e[0]!, [], { login: "n", now: NOW, meta: "t", commitError: "boom" });
+    const last = view.sections[view.sections.length - 1]!;
+    expect(last.kind).toBe("lines");
+    expect(last.rows[0]!.cells[0]!.text).toContain("boom");
   });
 });
 
@@ -572,6 +671,13 @@ describe("renderView", () => {
   });
 });
 
+// Pull the embedded view model back out of the page, the way the browser does.
+function payloadOf(html: string): any {
+  const m = html.match(/<script type="application\/json" id="shelf-data">([\s\S]*?)<\/script>/);
+  if (!m) throw new Error("no shelf-data payload in page");
+  return JSON.parse(m[1]!);
+}
+
 describe("renderHtml", () => {
   const v = indexView(mergeEntries([repo({ name: "swatch" })], [], "nitrimandylis"), {
     login: "nitrimandylis",
@@ -586,23 +692,56 @@ describe("renderHtml", () => {
     expect(html).not.toMatch(/<(script|link|img)[^>]+(src|href)="https?:/);
   });
 
-  test("escapes text that would otherwise be markup", () => {
+  test("neutralises markup in the embedded data payload", () => {
     const nasty = indexView(
-      mergeEntries([repo({ name: "x", description: `<img onerror="alert(1)">& "quoted"` })], [], "n"),
+      mergeEntries(
+        [repo({ name: "x", description: `</script><img onerror="alert(1)">& "quoted"` })],
+        [],
+        "n",
+      ),
       { login: "n", meta: "t", now: NOW },
     );
     const html = renderHtml(nasty);
-    expect(html).not.toContain("<img onerror");
-    expect(html).toContain("&lt;img onerror=");
+    // The payload must not be able to close its own script tag.
+    expect(html).not.toContain("</script><img");
+    expect(html).toContain("\\u003c/script");
+    // Exactly two script tags: the JSON payload and the renderer.
+    expect(html.match(/<script/g)).toHaveLength(2);
+  });
+
+  test("jsonScript escapes angle brackets and line separators", () => {
+    expect(jsonScript({ a: "</script>" })).not.toContain("</script>");
+    expect(jsonScript({ a: "\u2028\u2029" })).not.toMatch(/[\u2028\u2029]/);
+    // still valid JSON, and the escapes survive a parse back to the original
+    expect(JSON.parse(jsonScript({ a: "</script>\u2028x" }))).toEqual({ a: "</script>\u2028x" });
+  });
+
+  test("the payload round-trips to the same view", () => {
+    const back = payloadOf(renderHtml(v));
+    expect(back.title).toBe(v.title);
+    expect(back.sections[0].rows.length).toBe(v.sections[0]!.rows.length);
+    expect(back.sections[0].columns.length).toBe(v.sections[0]!.columns!.length);
   });
 
   test("the refresh button only exists when something can serve it", () => {
-    expect(renderHtml(v, { refreshable: true })).toContain('href="/?refresh=1"');
-    expect(renderHtml(v, { refreshable: false })).not.toContain("refresh=1");
+    const live = renderHtml(v, { refreshable: true });
+    expect(live).toContain('id="refresh"');
+    expect(live).toContain('data-url="/api/data?refresh=1"');
+    const stat = renderHtml(v, { refreshable: false });
+    expect(stat).not.toContain('id="refresh"');
+    expect(stat).not.toContain("refresh=1");
   });
 
-  test("carries sort keys so the client can sort numerically", () => {
-    expect(renderHtml(v)).toContain("data-sort=");
+  test("static export is still self-contained and inert", () => {
+    const stat = renderHtml(v, { refreshable: false });
+    expect(stat).not.toMatch(/<(script|link|img)[^>]+(src|href)="https?:/);
+    expect(stat).toContain("shelf-data");
+  });
+
+  test("carries numeric sort keys so the client sorts on values, not text", () => {
+    const back = payloadOf(renderHtml(v));
+    const updated = back.sections[0].rows[0].cells[2];
+    expect(typeof updated.sort).toBe("number");
   });
 
   test("private repos never reach the public index", () => {

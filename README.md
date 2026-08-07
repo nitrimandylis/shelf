@@ -69,6 +69,22 @@ nick@shelf:~$ shelf
 
 Every one of them takes `--json` for machines and `--html` for a browser.
 
+## 🖥 The browser view
+
+`--html` is not the terminal table with fonts on it. It serves a page on a random
+loopback port where the counts across the top are filters, `group` buckets rows by
+state or language or activity, every column header sorts, and the activity column
+is a real chart whose bars tell you the week and the commit count when you point at
+them. `/` focuses the filter, `j`/`k` move, `enter` opens the repo, `esc` clears.
+
+Refresh swaps the data in place over `/api/data` with a progress bar rather than
+reloading, because a cold GitHub fetch takes ten seconds and a page that freezes for
+ten seconds looks broken.
+
+`-o FILE` writes the same page as a static file — filtering, grouping and charts
+intact, refresh button gone. Both render from a JSON model embedded in the document,
+so the page needs JavaScript and nothing else; there is no network request in it.
+
 ## 🚀 Run it
 
 Needs [Bun](https://bun.sh) and either `GITHUB_TOKEN` set or `gh` logged in.
@@ -117,7 +133,7 @@ flowchart LR
 | local | `local.ts` | repo discovery, `status --porcelain=v2` parsing, weekly buckets |
 | model | `model.ts` | merge, sparkline, widths, the audit checks — all pure, all tested |
 | views | `views.ts` | one data model both renderers read |
-| render | `term.ts` · `html.ts` | ansi table · self-contained page with sort and filter |
+| render | `term.ts` · `html.ts` | ansi table · self-contained page that renders from the same model as JSON |
 
 Eight weekly commit counts come back as aliased `history(since:, until:)` totals
 rather than a node list, because a node list caps at 100 and silently drops the

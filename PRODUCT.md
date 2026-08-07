@@ -3,6 +3,14 @@
 A CLI that shows every repo you have — the ones on GitHub, the ones on this
 machine, and the difference between the two.
 
+## Register
+
+product
+
+The surface is a tool. Design serves the task of deciding what to work on next;
+it is never the product itself. Density is a feature, familiarity is a feature,
+and the interface should disappear into the scan.
+
 ## Why it exists
 
 `gh repo list` shows names with no activity, no local state and no issues.
@@ -62,6 +70,23 @@ feeding two renderers rather than four bespoke pages.
   cloning. The tool reports; the user acts.
 - **HTML is an ephemeral server, not a daemon.** Random port on loopback, dies
   with Ctrl-C. `-o FILE` is the static path for anything worth keeping.
+- **The browser view earns being a browser view.** Real SVG activity charts,
+  state as colour and position rather than a word to read, facet chips that are
+  also the counts, grouping, column sort and keyboard navigation. If it were
+  only the terminal table with nicer fonts it should not exist.
+- **The page renders from the embedded model, not from server-rendered rows.**
+  The server ships the `View` as JSON in the document and the client draws from
+  it, so filter, group, sort and refresh all operate on data. That keeps one
+  data model feeding both renderers instead of two divergent templates. The
+  cost, stated plainly: the page needs JavaScript, and scraping its markup
+  yields nothing — `--json` is the machine path.
+- **Refresh never blocks the page.** A cold pull is 9-11 seconds, so refresh
+  fetches `/api/data`, shows a progress indicator and swaps in place. A page
+  that freezes for ten seconds reads as broken, and reloading would do exactly
+  that.
+- **A refresh that silently fell back to cache still says so.** The payload
+  carries the warning and the client re-renders it, or stale data would look
+  current.
 
 ## The finding that shaped the audit
 

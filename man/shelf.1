@@ -62,12 +62,24 @@ below.
 .TP
 .B \-\-html
 Render in a browser. Starts a server on a random port bound to 127.0.0.1,
-opens it, and runs until interrupted. The page sorts by any column and filters
-across all rows, and its refresh button refetches live.
+opens it, and runs until interrupted.
+.IP
+The page is a working surface, not a dump. Counts along the top double as
+filters; \fBgroup\fR buckets rows by state, language or activity; any column
+header sorts; the activity column is drawn as a real chart whose bars name their
+week and commit count on hover. Keys: \fB/\fR focuses the filter, \fBj\fR and
+\fBk\fR move the selection, \fBEnter\fR opens the selected repo on GitHub,
+\fBEsc\fR clears. Refresh refetches over \fB/api/data\fR and swaps the data in
+place with a progress indicator, so a 9-11 second cold fetch never presents as a
+frozen page.
+.IP
+The page renders from a JSON model embedded in the document, so it requires
+JavaScript. Everything is inline: no network request is made to render it.
 .TP
 .BR \-o ", " \-\-out " " \fIFILE\fR
-Write the HTML to \fIFILE\fR instead of serving it. The written page is static
-and carries no refresh button.
+Write the HTML to \fIFILE\fR instead of serving it. The written page is static:
+it keeps filtering, grouping, sorting and the charts, but has no refresh button
+and needs no server.
 .TP
 .B \-\-no\-open
 With \fB\-\-html\fR, do not launch the browser.

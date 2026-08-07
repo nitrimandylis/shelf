@@ -53,6 +53,11 @@ timeout. If the user wants the browser view, hand them the command to type.
 `-o FILE` is the non-blocking alternative: it writes the same page to a file
 and exits.
 
+**Never scrape the HTML.** The page renders client-side from a JSON model
+embedded in a `<script type="application/json">`, so the markup contains no
+rows and a text extractor gets nothing. Use `--json`, which is the same data
+without the parsing.
+
 ## JSON shapes
 
 `shelf --json` → `{fetchedAt, cacheAgeMinutes, login, repos: [...]}`
