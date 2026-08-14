@@ -19,6 +19,8 @@
 ![writes](https://img.shields.io/badge/writes_to_github-never-brightgreen?style=flat-square&labelColor=111111)
 ![license](https://img.shields.io/badge/license-MIT-lightgrey?style=flat-square&labelColor=111111)
 
+![shelf](.github/assets/shelf.gif)
+
 </div>
 
 ---

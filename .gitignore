@@ -3,3 +3,4 @@ node_modules/
 !man/*
 .DS_Store
 .env*
+tapes/fixtures/
