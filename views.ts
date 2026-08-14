@@ -11,6 +11,7 @@ import {
   humanSize,
 } from "./model.ts";
 import type { CommitLine } from "./github.ts";
+import { shortenHome } from "./config.ts";
 
 // A view is one data model that both renderers consume. The terminal pads it;
 // the browser serialises it to JSON and renders from that. Neither renderer
@@ -277,7 +278,9 @@ export function auditView(
         facets: { check: title },
         cells: [
           c(f.repo, "accent", { href: f.url ?? ghUrl(f.repo, o.login) }),
-          c(f.detail, tone),
+          // Only the human view shortens; --json keeps the absolute path a
+          // script would need to cd into.
+          c(shortenHome(f.detail), tone),
         ],
       })),
     };
@@ -351,7 +354,7 @@ export function showView(
 
   if (e.local) {
     const l = e.local;
-    fact("local", l.path, "good");
+    fact("local", shortenHome(l.path), "good");
     fact("branch", `${l.branch ?? "(detached)"}${l.upstream ? ` → ${l.upstream}` : " (no upstream)"}`);
     fact("worktree", localNote(l), l.dirty || l.ahead ? "warn" : "good");
   } else if (gh) {
