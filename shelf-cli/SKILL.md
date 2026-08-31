@@ -30,7 +30,7 @@ to common roots like `~/code`, `~/src`, `~/projects`, `~/Developer`, skipping
 any that do not exist; **if the user sees no local repos, this is almost always
 why**), `activeDays` (the
 warm/cold threshold, default 90), `cacheTtlMinutes` (default 60), `heavyMb`
-(default 20), `exclude`.
+(default 20), `exclude`, `scanDepth` (how deep under each scanPath, default 2).
 
 ## Commands
 
@@ -61,7 +61,7 @@ The one command that blocks: **`--html` starts a server and never returns**
 (it runs until Ctrl-C). Never invoke it from a tool call — you will hang until
 timeout. If the user wants the browser view, hand them the command to type.
 `-o FILE` is the non-blocking alternative: it writes the same page to a file
-and exits.
+and exits. `--no-open` suppresses the automatic browser launch.
 
 Cards (the per-repo side panel with the README) exist only in the served page,
 because they are fetched from `/api/repo?name=<repo>`. A written `-o` file has
@@ -95,6 +95,8 @@ clean. Findings are `{repo, detail, url?}`.
 `shelf show <repo> --json` → one repo object plus `recentCommits`.
 
 `shelf index --json` → `{login, repos: [...]}`, public non-forks only.
+
+`shelf scan --json` → `{configPath, scanDepth, roots: [...]}`.
 
 Useful one-liners:
 
