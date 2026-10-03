@@ -28,14 +28,15 @@ coding-task list; it never enumerates repos. deck was shelved for duplicating
 glance. shelf overlaps neither: it is a terminal command you run on purpose,
 answering a question that needs both halves of the picture at once.
 
-## Four jobs
+## Five jobs
 
 1. **Triage** (`shelf`) — what is warm, what is cold, what is unpushed.
 2. **Audit** (`shelf audit`) — hygiene plus the checks that actually fire.
 3. **Inspect** (`shelf show <repo>`) — one repo on one screen.
 4. **Index** (`shelf index`) — the uncurated public list of everything built.
+5. **Scan** (`shelf scan`) — where it looks for local repos, and add or remove a root.
 
-Each has both a terminal and an HTML rendering, kept cheap by one data model
+The first four have both a terminal and an HTML rendering, kept cheap by one data model
 feeding two renderers rather than four bespoke pages.
 
 ## Decisions
@@ -88,7 +89,7 @@ feeding two renderers rather than four bespoke pages.
   keeps its selection, so `j`/`k` walks the list with the card following. A
   modal would hide the list you are triaging against, and product UI should
   exhaust inline alternatives before reaching for one.
-- **Cards are lazy and bounded.** One live GitHub call (~0.75s) when a card
+- **Cards are lazy and bounded.** One live GitHub call (~0.75s, for commits, README, languages and the latest release) when a card
   opens, never 46 calls up front. A newer card always wins: a slow earlier
   request cannot overwrite it.
 - **The README is rendered on the server, not in the page.** It is markdown from
@@ -119,7 +120,7 @@ The tool assumes a GitHub account and a Mac, which are product constraints. It
 must not assume *this* machine:
 
 - **Scan roots default to the conventional ones** (`~/code`, `~/src`, `~/dev`,
-  `~/Developer`, `~/projects`, `~/repos`, `~/git`, `~/work`, `~/workspace`),
+  `~/develop`, `~/Developer`, `~/projects`, `~/repos`, `~/git`, `~/work`, `~/workspace`),
   with missing ones skipped. `~/cc` was the original default and is a fact about
   one machine, not a sensible guess for anyone else; it now lives in that user's
   own config file.
@@ -156,5 +157,5 @@ must not assume *this* machine:
 
 ## Status
 
-Built 2026-08-06. Not published. 79 tests, typecheck clean, man page linted,
+Built 2026-08-06. On GitHub at nitrimandylis/shelf. 124 tests, typecheck clean, man page linted,
 verified against live data and in a real browser in both colour schemes.

@@ -25,8 +25,8 @@ options
   --all           include cold repos in triage instead of collapsing them
   --refresh       refetch from GitHub, ignoring the cache TTL
   --json          machine output: one JSON value on stdout, nothing else
-  --html          render in a browser (ephemeral localhost server, ctrl-c to stop)
-  -o, --out FILE  write the HTML to a file instead of serving it
+  --html          render in a browser (ephemeral localhost server, ctrl-c to stop; not for scan)
+  -o, --out FILE  write the HTML to a file instead of serving it (not for scan)
   --no-open       with --html, do not launch the browser
   --no-links      with audit, skip the homepage link check (no network)
   -h, --help      this
@@ -36,7 +36,7 @@ data
   GitHub is cached at ~/.cache/shelf/repos.json (TTL from config, default 60m).
   The local git scan runs live on every invocation.
   Config: ${configPath()}
-  Auth: GITHUB_TOKEN, falling back to the token from \`gh auth token\`.
+  Auth: GITHUB_TOKEN (or GH_TOKEN), falling back to the token from \`gh auth token\`.
 `;
 
 // ---------------------------------------------------------------- args
@@ -415,6 +415,11 @@ async function buildRepoView(cfg: Config, name: string): Promise<View> {
  * likely first-run confusion.
  */
 async function cmdScan(cfg: Config, flags: Flags): Promise<void> {
+  if (flags.html || flags.out) {
+    console.error("scan has no html view, so --html and -o do not apply; use --json for machine output");
+    process.exitCode = 1;
+    return;
+  }
   const target = flags.add ?? flags.remove;
 
   if (target) {

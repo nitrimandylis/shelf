@@ -40,7 +40,7 @@ being hidden.
 .TP
 .B show \fIrepo\fR
 One repo on one screen: everything already cached, plus one live call for
-recent commits and CI state. For a repo with no GitHub side the commits come
+recent commits, the README, languages and the latest release. CI state comes from the cached query. For a repo with no GitHub side the commits come
 from the local log instead. The name is matched case-insensitively, and a near
 miss suggests candidates.
 .TP
@@ -73,7 +73,7 @@ Machine output: exactly one JSON value on stdout and nothing else. See
 below.
 .TP
 .B \-\-html
-Render in a browser. Starts a server on a random port bound to 127.0.0.1,
+Render in a browser. Not accepted by \fBscan\fR, which exits 1. Starts a server on a random port bound to 127.0.0.1,
 opens it, and runs until interrupted.
 .IP
 Clicking a row (or pressing \fBEnter\fR) opens a card in a side panel: the
@@ -97,7 +97,7 @@ The page renders from a JSON model embedded in the document, so it requires
 JavaScript. Everything is inline: no network request is made to render it.
 .TP
 .BR \-o ", " \-\-out " " \fIFILE\fR
-Write the HTML to \fIFILE\fR instead of serving it. The written page is static:
+Write the HTML to \fIFILE\fR instead of serving it. Not accepted by \fBscan\fR, which exits 1. The written page is static:
 it keeps filtering, grouping, sorting and the charts, but has no refresh button
 and needs no server. Cards need a server to answer, so rows in a written file
 open the repo on GitHub instead.
@@ -152,7 +152,7 @@ written to disk by shelf.
 .I ~/.config/shelf/config.json
 Written with defaults on first run, and the path is printed the first time.
 Keys: \fBscanPaths\fR (roots to scan, tilde allowed; defaults to the common
-ones \- \fI~/code\fR, \fI~/src\fR, \fI~/dev\fR, \fI~/Developer\fR,
+ones \- \fI~/code\fR, \fI~/src\fR, \fI~/dev\fR, \fI~/develop\fR, \fI~/Developer\fR,
 \fI~/projects\fR, \fI~/repos\fR, \fI~/git\fR, \fI~/work\fR and
 \fI~/workspace\fR \- with missing ones skipped, so set this if your code lives
 elsewhere, or use \fBshelf scan \-\-add\fR), \fBscanDepth\fR (how deep to
@@ -190,7 +190,9 @@ server answered badly, \fBno-answer\fR when it did not answer twice.
 empty \fBdeadLinks\fR is never mistaken for a clean result.
 .TP
 .B shelf show \fIrepo\fR \fB\-\-json\fR
-One repo object in the shape above, plus \fBrecentCommits\fR.
+One repo object in the shape above, plus \fBrecentCommits\fR, \fBlanguages\fR,
+\fBlatestRelease\fR and \fBhasReadmeBody\fR (true when a README was fetched; the body itself is not
+included).
 .TP
 .B shelf index \-\-json
 \fB{login, repos: []}\fR, public non-forks only.

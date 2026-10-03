@@ -57,7 +57,7 @@ their code lives rather than guessing.
 it to the user. Human output is aligned and coloured and is not a parsing
 target.
 
-The one command that blocks: **`--html` starts a server and never returns**
+The one command that blocks: **`--html` starts a server and never returns** (`shelf scan --html` and `shelf scan -o` are rejected with exit 1)
 (it runs until Ctrl-C). Never invoke it from a tool call — you will hang until
 timeout. If the user wants the browser view, hand them the command to type.
 `-o FILE` is the non-blocking alternative: it writes the same page to a file
@@ -92,7 +92,7 @@ and every local-side key (`path`, `branch`, `dirty`, `ahead`, `behind`) is
 privateSkipped, linksChecked}`. The five checks are always arrays, empty when
 clean. Findings are `{repo, detail, url?}`.
 
-`shelf show <repo> --json` → one repo object plus `recentCommits`.
+`shelf show <repo> --json` → one repo object plus `recentCommits`, `languages`, `latestRelease` and `hasReadmeBody`.
 
 `shelf index --json` → `{login, repos: [...]}`, public non-forks only.
 

@@ -60,17 +60,17 @@ nick@shelf:~$ shelf
 | 06 | **state** | `● synced` · `▲ remote` · `○ local` — matched on origin url, never on folder name |
 | 07 | **note** | `UNPUBLISHED`, dirty and unpushed counts, `archived`, `private`, failing ci |
 
-## 🔍 The four commands
+## 🔍 The five commands
 
 | | command | what it actually does |
 |---|---|---|
 | 01 | `shelf` | triage. warm repos in full, cold ones collapsed to a single line |
 | 02 | `shelf audit` | five checks. empty ones print a tick instead of hiding, so the output stays honest |
-| 03 | `shelf show <repo>` | one repo, one screen. everything cached, plus one live call for commits and ci |
+| 03 | `shelf show <repo>` | one repo, one screen. everything cached, plus one live call for commits, README, languages and the latest release |
 | 04 | `shelf index` | every public non-fork grouped by language — the uncurated long tail, meant for `-o` |
 | 05 | `shelf scan` | where it looks for local repos · `--add`/`--remove` a root without editing json |
 
-Every one of them takes `--json` for machines and `--html` for a browser.
+Every one of them takes `--json` for machines. All but `scan` also take `--html` for a browser and `-o FILE` to write it; `scan` exits 1 on either.
 
 ## 🖥 The browser view
 
@@ -139,7 +139,7 @@ flowchart LR
 
 | layer | path | job |
 |---|---|---|
-| entry | `shelf.ts` | arg parsing, four commands, the json shapes |
+| entry | `shelf.ts` | arg parsing, five commands, the json shapes |
 | github | `github.ts` | one graphql query, the cache, token resolution |
 | local | `local.ts` | repo discovery, `status --porcelain=v2` parsing, weekly buckets |
 | model | `model.ts` | merge, sparkline, widths, the audit checks — all pure, all tested |
